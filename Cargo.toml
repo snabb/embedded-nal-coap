@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 coap-message = "^0.1"
 coap-handler = "^0.0.1"
-coap-message-utils = { path = "../coap-message-utils/" }
+coap-message-utils = "^0.0.2"
 embedded-nal = "0.2"
 heapless = "^0.5"
 
