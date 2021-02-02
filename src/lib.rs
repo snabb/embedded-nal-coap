@@ -11,6 +11,10 @@
 //! * The response logic is implemented using [nb] and does not attempt to store responses for
 //!   later invocations. If a request comes in and the response can't be sent right away, it is
 //!   discarded.
+//!
+//! * Being based on embedded-nal, it binds to the any-address but leaves the network stack to
+//!   choose the sending address; this leads to subtle bugs when runnign on a system with multiple
+//!   IP addresses.
 #![no_std]
 
 mod message;
