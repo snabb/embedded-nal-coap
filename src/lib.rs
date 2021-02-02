@@ -19,17 +19,35 @@
 
 mod message;
 
+use num_traits::{FromPrimitive, ToPrimitive};
+use num_derive::{FromPrimitive, ToPrimitive};
+
 use embedded_nal::nb::Result;
+
+const COAP_VERSION: u8 = 1;
+
+/// Maximum size of a CoAP message we need to expect
+///
+/// Also used in creating an output buffer as it's allocated the same way anyway.
+const MAX_SIZE: usize = 1152;
+
+#[derive(FromPrimitive, ToPrimitive, PartialEq)]
+enum Type {
+    CON = 0,
+    NON = 1,
+    ACK = 2,
+    RST = 3,
+}
 
 pub fn poll<ST>(stack: &ST, socket: &mut ST::UdpSocket, handler: &mut impl coap_handler::Handler) -> Result<(), ST::Error>
 where
     ST: embedded_nal::UdpServer,
 {
     // Receive step
-    let (extracted, addr, t, msgid, token) = {
+    let (extracted, addr, t_in, msgid, token) = {
         // too bad it needs to be initialized -- but see
         // https://github.com/rust-embedded-community/embedded-nal/issues/12 & co
-        let mut buf: [u8; 1152] = [0; 1152];
+        let mut buf: [u8; MAX_SIZE] = [0; MAX_SIZE];
 
         let (len, addr) = stack.receive(socket, &mut buf)?;
         let buf = &buf[..len];
@@ -40,12 +58,13 @@ where
             return Ok(());
         }
         let ver = buf[0] >> 6;
-        if ver != 1 {
+        if ver != COAP_VERSION {
             // Mismatching version: MUST be silently ignored
             return Ok(());
         }
-        let t = (buf[0] >> 4) & 0x03;
-        if t > 1 {
+        let t_in = Type::from_u8((buf[0] >> 4) & 0x03)
+            .expect("Success guaranteed by numberof variants and input size");
+        if t_in == Type::ACK || t_in == Type::RST {
             // We're not a client and always respond piggy-backed, thus never expect ACKs or RSTs
             return Ok(());
         }
@@ -70,7 +89,7 @@ where
         (
             handler.extract_request_data(&msg),
             addr,
-            t,
+            t_in,
             msgid,
             token,
         )
@@ -79,9 +98,10 @@ where
     // Send step
     {
         // Could make this smaller based on asking the handler
-        let mut buf: [u8; 1152] = [0; 1152];
+        let mut buf: [u8; MAX_SIZE] = [0; MAX_SIZE];
 
-        buf[0] = (1 << 6) | (if t == 0 { 2 } else { 1 } << 4) | (token.len() as u8);
+        let t_out = if t_in == Type::CON { Type::ACK } else { Type::NON };
+        buf[0] = (COAP_VERSION << 6) | ((t_out.to_u8().unwrap()) << 4) | (token.len() as u8);
         buf[2..4].copy_from_slice(&msgid.to_be_bytes());
         buf[4..4 + token.len()].copy_from_slice(&token);
         let (header, tokentail) = buf.split_at_mut(4);
