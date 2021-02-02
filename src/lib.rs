@@ -52,7 +52,7 @@ where
         let tkl = buf[0] & 0x0f;
         let tkl: usize = tkl.into();
         let code = buf[1];
-        let msgid = [buf[2], buf[3]];
+        let msgid = u16::from_be_bytes([buf[2], buf[3]]);
 
         if len < 4 + tkl {
             // Another form of too short a message
@@ -82,8 +82,7 @@ where
         let mut buf: [u8; 1152] = [0; 1152];
 
         buf[0] = (1 << 6) | (if t == 0 { 2 } else { 1 } << 4) | (token.len() as u8);
-        buf[2] = msgid[0];
-        buf[3] = msgid[1];
+        buf[2..4].copy_from_slice(&msgid.to_be_bytes());
         buf[4..4 + token.len()].copy_from_slice(&token);
         let (header, tokentail) = buf.split_at_mut(4);
         let code = &mut header[1];
