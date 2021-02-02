@@ -9,8 +9,9 @@ where
 
     use coap_handler::implementations::{new_dispatcher, TypedStaticResponse, HandlerBuilder};
     let mut handler = new_dispatcher()
-            .at(&[".well-known", "core"], TypedStaticResponse { payload: b"</board>,</led>", contentformat: &[40] })
-            .at(&["board"], TypedStaticResponse::from("native"));
+            .at(&[".well-known", "core"], TypedStaticResponse { payload: b"</board>", contentformat: &[40] })
+            .at(&["board"], TypedStaticResponse::from("native"))
+            ;
 
     // to be moved into the library
     stack.bind(&mut sock, 5683)
