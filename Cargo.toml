@@ -1,0 +1,15 @@
+[package]
+name = "embedded-nal-minimal-coapserver"
+version = "0.0.1"
+authors = ["chrysn <chrysn@fsfe.org>"]
+edition = "2018"
+
+[dependencies]
+coap-message = "^0.1"
+coap-handler = "^0.0.1"
+coap-message-utils = { path = "../coap-message-utils/" }
+embedded-nal = "0.2"
+heapless = "^0.5"
+
+[dev-dependencies]
+std-embedded-nal = { path = "../std-embedded-nal/" }
