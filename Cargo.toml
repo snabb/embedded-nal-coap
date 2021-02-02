@@ -12,4 +12,4 @@ embedded-nal = "0.2"
 heapless = "^0.5"
 
 [dev-dependencies]
-std-embedded-nal = { path = "../std-embedded-nal/" }
+std-embedded-nal = "^0.0.3"
