@@ -1,5 +1,4 @@
 use embedded_nal::UdpServer;
-use embedded_nal::nb::block;
 
 fn run<S>(stack: &S)
 where
@@ -18,7 +17,15 @@ where
         .expect("Can't bind to port");
 
     loop {
-        block!(embedded_nal_minimal_coapserver::poll(stack, &mut sock, &mut handler)).expect("UDP error during send/receive");
+        match embedded_nal_minimal_coapserver::poll(stack, &mut sock, &mut handler) {
+            Err(embedded_nal::nb::Error::WouldBlock) => {
+                // Give the CPU some time to not busy-loop. Doing it this way is an experiment to
+                // help the discussion of
+                // <https://github.com/rust-embedded-community/embedded-nal/issues/47>.
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            },
+            e => e.expect("UDP error during send/receive"),
+        }
     }
 }
 
