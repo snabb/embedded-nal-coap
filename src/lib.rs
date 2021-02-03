@@ -66,7 +66,7 @@ enum Type {
 
 pub fn poll<ST>(stack: &ST, socket: &mut ST::UdpSocket, handler: &mut impl coap_handler::Handler) -> Result<(), ST::Error>
 where
-    ST: embedded_nal::UdpServer,
+    ST: embedded_nal::UdpServer + ?Sized,
 {
     // Receive step
     let (extracted, addr, t_in, msgid, token) = {
