@@ -1,0 +1,49 @@
+[![Build Status](https://gitlab.com/chrysn/embedded-nal-minimal-coapserver/badges/master/pipeline.svg)](https://gitlab.com/chrysn/embedded-nal-minimal-coapserver/commits/master)
+![Maintenance](https://img.shields.io/badge/maintenance-experimental-blue.svg)
+
+# embedded-nal-minimal-coapserver
+
+A minimal CoAP server implementation built on [embedded-nal].
+
+Usage and operation
+-------------------
+
+Until the project has matured further, see `examples/demo.rs` for usage. The general steps are:
+
+* Get a network stack with a UDP server socket that implments [embedded_nal::UdpServer]
+
+* Create a CoAP handler that implements [coap_handler::Handler]; the
+  [coap_handler::implementations] module contains some building blocks
+  (including some to combine handlers for individual resources into a handler that picks
+  sub-handlers from the URI path).
+
+* Whenever there is indication that a request might have come in, call [poll] with the stack,
+  the socket and the handler. This will accept the data from the socket, decode the CoAP
+  message, pass it to the handler, and send back the response.
+
+  It returns successful if a message was processed (or something came in that could be
+  ignored), propagates out errors from the socket, and returns [nb::Error::WouldBlock] if it
+  turms out the socket was *not* ready.
+
+  By applying the belowmentioned constraints and exercising some of the liberties designed into
+  CoAP, the server does not need to hold any state of its own.
+
+Caveats
+-------
+
+* The server does not perform any amplification mitigation (and the handler can't for lack of
+  remote information); use this only in environments where this is acceptable (e.g. in closed
+  networks).
+
+* The server does not perform any message deduplication. All handler functions must therefore
+  be idempotent.
+
+* The response logic is implemented using [nb] and does not attempt to store responses for
+  later invocations. If a request comes in and the response can't be sent right away, it is
+  discarded.
+
+* Being based on embedded-nal, it binds to the any-address but leaves the network stack to
+  choose the sending address; this leads to subtle bugs when runnign on a system with multiple
+  IP addresses.
+
+License: MIT OR Apache-2.0
