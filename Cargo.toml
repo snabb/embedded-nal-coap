@@ -3,6 +3,15 @@ name = "embedded-nal-minimal-coapserver"
 version = "0.0.1"
 authors = ["chrysn <chrysn@fsfe.org>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://gitlab.com/chrysn/embedded-nal-minimal-coapserver"
+keywords = ["network", "coap"]
+categories = ["embedded", "no-std"]
+description = "A minimal CoAP server implementation built on embedded-nal"
+
+[badges]
+gitlab = { repository = "chrysn/embedded-nal-minimal-coapserver" }
+maintenance = { status = "experimental" }
 
 [dependencies]
 coap-message = "^0.1"
