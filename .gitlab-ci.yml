@@ -1,0 +1,14 @@
+test:stable:
+  image: rust:latest
+  script:
+  - cargo version && cargo build --all
+
+test:beta:
+  image: rustdocker/rust:beta
+  script:
+  - cargo version && cargo build --all
+
+test:nightly:
+  image: rustdocker/rust:nightly
+  script:
+  - cargo version && cargo build --all
