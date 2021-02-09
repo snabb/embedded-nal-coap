@@ -57,8 +57,8 @@
 
 mod message;
 
-use num_traits::{FromPrimitive, ToPrimitive};
 use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use embedded_nal::nb::Result;
 
@@ -87,7 +87,11 @@ enum Type {
 /// treated as per the protocol and are not indicated separately; they cause a successful return.
 ///
 /// Note that the caveats in the module description apply.
-pub fn poll<ST>(stack: &ST, socket: &mut ST::UdpSocket, handler: &mut impl coap_handler::Handler) -> Result<(), ST::Error>
+pub fn poll<ST>(
+    stack: &ST,
+    socket: &mut ST::UdpSocket,
+    handler: &mut impl coap_handler::Handler,
+) -> Result<(), ST::Error>
 where
     ST: embedded_nal::UdpServer + ?Sized,
 {
@@ -134,13 +138,7 @@ where
 
         let msg = coap_message_utils::inmemory::Message::new(code, tail);
 
-        (
-            handler.extract_request_data(&msg),
-            addr,
-            t_in,
-            msgid,
-            token,
-        )
+        (handler.extract_request_data(&msg), addr, t_in, msgid, token)
     };
 
     // Send step
@@ -148,7 +146,11 @@ where
         // Could make this smaller based on asking the handler
         let mut buf: [u8; MAX_SIZE] = [0; MAX_SIZE];
 
-        let t_out = if t_in == Type::CON { Type::ACK } else { Type::NON };
+        let t_out = if t_in == Type::CON {
+            Type::ACK
+        } else {
+            Type::NON
+        };
         buf[0] = (COAP_VERSION << 6) | ((t_out.to_u8().unwrap()) << 4) | (token.len() as u8);
         buf[2..4].copy_from_slice(&msgid.to_be_bytes());
         buf[4..4 + token.len()].copy_from_slice(&token);

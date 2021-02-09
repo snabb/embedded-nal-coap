@@ -29,15 +29,17 @@ pub(crate) struct Message<'a> {
 
 impl<'a> Message<'a> {
     pub(crate) fn new(code: &'a mut u8, tail: &'a mut [u8]) -> Self {
-        Message { code, tail, cursor: Options { latest: 0, end: 0 } }
+        Message {
+            code,
+            tail,
+            cursor: Options { latest: 0, end: 0 },
+        }
     }
 
     /// Last written-to byte
     fn end(&self) -> usize {
         match self.cursor {
-            Options { latest: _, end } |
-                Payload { start: _, end } |
-                NoPayload { end } => end
+            Options { latest: _, end } | Payload { start: _, end } | NoPayload { end } => end,
         }
     }
 
@@ -58,12 +60,14 @@ impl<'a> coap_message::MinimalWritableMessage for Message<'a> {
     fn add_option(&mut self, number: u16, data: &[u8]) {
         let (latest, end) = match &mut self.cursor {
             Options { latest, end } => (latest, end),
-            _ => panic!("Sequence violation: Content set")
+            _ => panic!("Sequence violation: Content set"),
         };
-        let delta = number.checked_sub(*latest)
+        let delta = number
+            .checked_sub(*latest)
             .expect("Sequence violation: Options shuffled");
         *latest = number;
-        let encoded = coap_message_utils::option_extension::encode_extensions(delta, data.len() as u16);
+        let encoded =
+            coap_message_utils::option_extension::encode_extensions(delta, data.len() as u16);
         let encoded = encoded.as_ref();
         self.tail[*end..*end + encoded.len()].copy_from_slice(encoded);
         *end += encoded.len();
@@ -77,7 +81,7 @@ impl<'a> coap_message::MinimalWritableMessage for Message<'a> {
             // We might allow double setting the payload through later extensions, but as for this
             // interface it's once only. We don't detect double setting of empty payloads, but it's
             // not this implementation's purpose to act as a linter.
-            _ => panic!("Sequence violation: doublepayload")
+            _ => panic!("Sequence violation: doublepayload"),
         };
         if payload.len() > 0 {
             self.tail[optend] = 0xff;
@@ -101,9 +105,8 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
             Payload { start, end } => &mut self.tail[start..end],
             // We *could* support this, but other libraries don't so let's not perpetuate the
             // deprecated interface
-            _ => panic!("Please set payload initially, or use payload_mut_with_len first")
+            _ => panic!("Please set payload initially, or use payload_mut_with_len first"),
         }
-
     }
 
     fn payload_mut_with_len(&mut self, len: usize) -> &mut [u8] {
@@ -133,19 +136,29 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
     fn truncate(&mut self, len: usize) {
         self.cursor = match (len, self.cursor) {
             (0, Options { end, .. }) | (0, NoPayload { end, .. }) => NoPayload { end },
-            (0, Payload { start, .. }) => NoPayload { end: start - 1  },
+            (0, Payload { start, .. }) => NoPayload { end: start - 1 },
             // Is panicking really cheaper here than just writing the payload marker and setting
             // the start right?
-            (_, Options { .. }) | (_, NoPayload { .. }) => panic!("Truncating would extend payload"),
+            (_, Options { .. }) | (_, NoPayload { .. }) => {
+                panic!("Truncating would extend payload")
+            }
             // It would also be safe to let this fall through, there's no unsafe access around, and
             // it would just fail when mapped -- but it may be odd because the error is deferred to
             // after finish().
-            (_, Payload { start, end }) if end - start < len => panic!("Truncating would extend payload"),
-            (_, Payload { start, .. }) => Payload { start, end: start + len },
+            (_, Payload { start, end }) if end - start < len => {
+                panic!("Truncating would extend payload")
+            }
+            (_, Payload { start, .. }) => Payload {
+                start,
+                end: start + len,
+            },
         }
     }
 
-    fn mutate_options<F>(&mut self, mut f: F) where F: FnMut(u16, &mut [u8]) -> () {
+    fn mutate_options<F>(&mut self, mut f: F)
+    where
+        F: FnMut(u16, &mut [u8]) -> (),
+    {
         // TBD this is excessively complex, and grounds for finding a better interface. ("Set
         // option and give me a key to update it later with a mutable reference")?
 
@@ -160,7 +173,7 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
 
         let mut option_base = 0;
 
-        while slice.len() > 0{
+        while slice.len() > 0 {
             // This is copied and adapted from
             // coap_messsage_utils::option_iteration::OptPayloadReader and not used through it,
             // because that'd be a whole separate implementation there with mut.
