@@ -48,15 +48,25 @@ Caveats
   choose the sending address; this leads to subtle bugs when runnign on a system with multiple
   IP addresses.
 
-Messages
---------
+* Messages are created with as little copying as [embedded_nal] permits. For writable messages,
+  that means that they need to be written to in ascending CoAP option number. This is in
+  accordance with the implemented [coap_message::MinimalWritableMessage] and
+  [coap_message_utils::MutableWritableMessage] traits.
 
-Messages are created right in the socket buffer, and are set out to work with minimal copying
-to the extent the [embedded_nal] interfaces permit, and prepared to go further once they
-evolve. In particular, this means that outgoing messages need to be written to in ascenging
-CoAP option number, in accordance with [coap_message::MinimalWritableMessage] and
-[coap_message_utils::MutableWritableMessage].
+  That restriction enables this crate to not only be `no_std`, but to not require `alloc`
+  either.
 
-This enables this crate to not only be `no_std`, but to not require `alloc` either.
+Roadmap
+-------
+
+The goal of this server is to become a component that can be used easily to bring CoAP
+connectivity to embedded devices at the bare minimum, while still being practically usable.
+
+This means that the amplification mitigation topic will need to be addressed, and that security
+backing must be catered for (probably by referring to an OSCORE/EDHOC mix-in).
+
+Other than that, this implementation's plan is to stay simple and utilize the optimizations
+CoAP offers, even if this means limiting the application (eg. to immediate responses, and to
+idempotent handlers).
 
 License: MIT OR Apache-2.0
