@@ -3,7 +3,9 @@
 //! Usage and operation
 //! -------------------
 //!
-//! Until the project has matured further, see `examples/demo.rs` for usage. The general steps are:
+//! Until the project has matured further, see [the example] for usage. The general steps are:
+//!
+//! [the example]: https://gitlab.com/chrysn/coap-message-demos/-/blob/master/examples/std_embedded_nal_minicoapserver.rs
 //!
 //! * Get a network stack with a UDP server socket that implments [embedded_nal::UdpServer]
 //!

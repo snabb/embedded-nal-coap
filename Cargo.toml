@@ -21,6 +21,3 @@ embedded-nal = "0.2"
 heapless = "^0.5"
 num-derive = "^0.3"
 num-traits = "^0.2"
-
-[dev-dependencies]
-std-embedded-nal = "^0.0.3"
