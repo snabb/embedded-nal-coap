@@ -15,7 +15,7 @@ maintenance = { status = "experimental" }
 
 [dependencies]
 coap-message = "^0.1"
-coap-handler = "^0.0.1"
+coap-handler = "^0.0.3"
 coap-message-utils = "^0.0.2"
 embedded-nal = "0.2"
 heapless = "^0.5"
