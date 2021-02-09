@@ -51,6 +51,8 @@
 //! evolve. In particular, this means that outgoing messages need to be written to in ascenging
 //! CoAP option number, in accordance with [coap_message::MinimalWritableMessage] and
 //! [coap_message_utils::MutableWritableMessage].
+//!
+//! This enables this crate to not only be `no_std`, but to not require `alloc` either.
 #![no_std]
 
 mod message;
@@ -75,6 +77,16 @@ enum Type {
     RST = 3,
 }
 
+/// Attempt to process one message out of the given `socket` on a UDP `stack`.
+///
+/// Any CoAP requests are dispatched to the handler. A response is built immediately and sent.
+///
+/// Failure to perform any action immediately makes the function return `WouldBlock`, and it should
+/// be called again whenever there is indication that the network device is ready again. Any errors
+/// from the stack are propagated out. Errors in message processing (eg. invalid CoAP messages) are
+/// treated as per the protocol and are not indicated separately; they cause a successful return.
+///
+/// Note that the caveats in the module description apply.
 pub fn poll<ST>(stack: &ST, socket: &mut ST::UdpSocket, handler: &mut impl coap_handler::Handler) -> Result<(), ST::Error>
 where
     ST: embedded_nal::UdpServer + ?Sized,
