@@ -8,7 +8,9 @@ A minimal CoAP server implementation built on [embedded-nal].
 Usage and operation
 -------------------
 
-Until the project has matured further, see `examples/demo.rs` for usage. The general steps are:
+Until the project has matured further, see [the example] for usage. The general steps are:
+
+[the example]: https://gitlab.com/chrysn/coap-message-demos/-/blob/master/examples/std_embedded_nal_minicoapserver.rs
 
 * Get a network stack with a UDP server socket that implments [embedded_nal::UdpServer]
 
@@ -45,5 +47,16 @@ Caveats
 * Being based on embedded-nal, it binds to the any-address but leaves the network stack to
   choose the sending address; this leads to subtle bugs when runnign on a system with multiple
   IP addresses.
+
+Messages
+--------
+
+Messages are created right in the socket buffer, and are set out to work with minimal copying
+to the extent the [embedded_nal] interfaces permit, and prepared to go further once they
+evolve. In particular, this means that outgoing messages need to be written to in ascenging
+CoAP option number, in accordance with [coap_message::MinimalWritableMessage] and
+[coap_message_utils::MutableWritableMessage].
+
+This enables this crate to not only be `no_std`, but to not require `alloc` either.
 
 License: MIT OR Apache-2.0
