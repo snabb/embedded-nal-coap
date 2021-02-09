@@ -1,3 +1,5 @@
+//! This module might be a candidate for moving over to coap-message-utils
+
 #[derive(Copy, Clone)]
 enum WriteState {
     /// No payload has been written; the last option had number `latest` and the next free byte is
