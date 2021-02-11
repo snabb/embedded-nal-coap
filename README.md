@@ -3,7 +3,7 @@
 
 # embedded-nal-minimal-coapserver
 
-A minimal CoAP server implementation built on [embedded-nal].
+A minimal CoAP server implementation built on [embedded_nal].
 
 Usage and operation
 -------------------

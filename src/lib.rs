@@ -1,4 +1,4 @@
-//! A minimal CoAP server implementation built on [embedded-nal].
+//! A minimal CoAP server implementation built on [embedded_nal].
 //!
 //! Usage and operation
 //! -------------------
@@ -19,7 +19,7 @@
 //!   message, pass it to the handler, and send back the response.
 //!
 //!   It returns successful if a message was processed (or something came in that could be
-//!   ignored), propagates out errors from the socket, and returns [nb::Error::WouldBlock] if it
+//!   ignored), propagates out errors from the socket, and returns [WouldBlock](embedded_nal::nb::Error::WouldBlock) if it
 //!   turms out the socket was *not* ready.
 //!
 //!   By applying the belowmentioned constraints and exercising some of the liberties designed into
@@ -35,7 +35,7 @@
 //! * The server does not perform any message deduplication. All handler functions must therefore
 //!   be idempotent.
 //!
-//! * The response logic is implemented using [nb] and does not attempt to store responses for
+//! * The response logic is implemented using [nb](embedded_nal::nb) and does not attempt to store responses for
 //!   later invocations. If a request comes in and the response can't be sent right away, it is
 //!   discarded.
 //!
@@ -46,7 +46,7 @@
 //! * Messages are created with as little copying as [embedded_nal] permits. For writable messages,
 //!   that means that they need to be written to in ascending CoAP option number. This is in
 //!   accordance with the implemented [coap_message::MinimalWritableMessage] and
-//!   [coap_message_utils::MutableWritableMessage] traits.
+//!   [coap_message::MutableWritableMessage] traits.
 //!
 //!   That restriction enables this crate to not only be `no_std`, but to not require `alloc`
 //!   either.
