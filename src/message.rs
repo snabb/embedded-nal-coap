@@ -129,6 +129,8 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
             Payload { start, .. } => (start, start + len),
         };
 
+        let end = end.clamp(0, self.tail.len());
+
         self.cursor = Payload { start, end };
         &mut self.tail[start..end]
     }
