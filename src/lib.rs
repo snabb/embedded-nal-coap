@@ -79,6 +79,7 @@ const COAP_VERSION: u8 = 1;
 /// Also used in creating an output buffer as it's allocated the same way anyway.
 const MAX_SIZE: usize = 1152;
 
+#[allow(clippy::upper_case_acronyms)] // because that's how they're written in CoAP
 #[derive(FromPrimitive, ToPrimitive, PartialEq)]
 enum Type {
     CON = 0,
@@ -174,7 +175,7 @@ where
 
         // Note that this `?` not only propagates errors but also WouldBlock -- and by doing so
         // discards the incoming request.
-        stack.send_to(socket, addr, &mut buf[..written])?;
+        stack.send_to(socket, addr, &buf[..written])?;
     };
 
     Ok(())

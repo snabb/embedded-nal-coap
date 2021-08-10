@@ -83,7 +83,7 @@ impl<'a> coap_message::MinimalWritableMessage for Message<'a> {
             // not this implementation's purpose to act as a linter.
             _ => panic!("Sequence violation: doublepayload"),
         };
-        if payload.len() > 0 {
+        if !payload.is_empty() {
             self.tail[optend] = 0xff;
             let start = optend + 1;
             let end = start + payload.len();
@@ -159,7 +159,7 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
 
     fn mutate_options<F>(&mut self, mut f: F)
     where
-        F: FnMut(u16, &mut [u8]) -> (),
+        F: FnMut(u16, &mut [u8]),
     {
         // TBD this is excessively complex, and grounds for finding a better interface. ("Set
         // option and give me a key to update it later with a mutable reference")?
@@ -175,7 +175,7 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
 
         let mut option_base = 0;
 
-        while slice.len() > 0 {
+        while !slice.is_empty() {
             // This is copied and adapted from
             // coap_messsage_utils::option_iteration::OptPayloadReader and not used through it,
             // because that'd be a whole separate implementation there with mut.
