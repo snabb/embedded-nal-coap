@@ -7,7 +7,7 @@
 //!
 //! [the example]: https://gitlab.com/chrysn/coap-message-demos/-/blob/master/examples/std_embedded_nal_minicoapserver.rs
 //!
-//! * Get a network stack with a UDP server socket that implments [embedded_nal::UdpServer]
+//! * Get a network stack with a UDP server socket that implments [embedded_nal::UdpFullStack]
 //!
 //! * Create a CoAP handler that implements [coap_handler::Handler]; the
 //!   [coap_handler::implementations] module contains some building blocks
@@ -98,12 +98,12 @@ enum Type {
 ///
 /// Note that the caveats in the module description apply.
 pub fn poll<ST>(
-    stack: &ST,
+    stack: &mut ST,
     socket: &mut ST::UdpSocket,
     handler: &mut impl coap_handler::Handler,
 ) -> Result<(), ST::Error>
 where
-    ST: embedded_nal::UdpServer + ?Sized,
+    ST: embedded_nal::UdpFullStack + ?Sized,
 {
     // Receive step
     let (extracted, addr, t_in, msgid, token) = {
