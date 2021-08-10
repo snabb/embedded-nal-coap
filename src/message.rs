@@ -190,17 +190,18 @@ impl<'a> coap_message::MutableWritableMessage for Message<'a> {
             let mut delta = (delta_len as u16) >> 4;
             let mut len = (delta_len as u16) & 0x0f;
 
-            // To get take_extension to cooperate...
-            let mut readable = &slice[..];
+            let new_len = {
+                // To get take_extension to cooperate...
+                let mut readable = &slice[..];
 
-            coap_message_utils::option_extension::take_extension(&mut delta, &mut readable)
-                .expect("Invalid encoded option in being-written message");
-            coap_message_utils::option_extension::take_extension(&mut len, &mut readable)
-                .expect("Invalid encoded option in being-written message");
+                coap_message_utils::option_extension::take_extension(&mut delta, &mut readable)
+                    .expect("Invalid encoded option in being-written message");
+                coap_message_utils::option_extension::take_extension(&mut len, &mut readable)
+                    .expect("Invalid encoded option in being-written message");
 
+                readable.len()
+            };
             // ... and get back to a mutable form
-            let new_len = readable.len();
-            drop(readable);
             let trim = slice.len() - new_len;
             slice = &mut slice[trim..];
 
