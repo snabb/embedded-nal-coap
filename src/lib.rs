@@ -63,6 +63,11 @@
 //! Other than that, this implementation's plan is to stay simple and utilize the optimizations
 //! CoAP offers, even if this means limiting the application (eg. to immediate responses, and to
 //! idempotent handlers).
+//!
+//! The server offers no support for sending requests, and minimal support for receiving responses
+//! through [poll_with_response_handler]. That interface is minimal by design and for user
+//! friendliness; it is expected to be used by a (necessarily somewhat more stateful) client
+//! implementation.
 #![no_std]
 
 mod message;
@@ -106,6 +111,37 @@ pub fn poll<ST>(
 where
     ST: embedded_nal::UdpFullStack + ?Sized,
 {
+    fn all_responses_are_unexpected(
+        _: u16,
+        _: &[u8],
+        _: &coap_message_utils::inmemory::Message<'_>,
+    ) -> bool {
+        false
+    }
+    poll_with_response_handler(stack, socket, handler, all_responses_are_unexpected)
+}
+
+/// Like [poll], but allowing a callback for response messages.
+///
+/// The `response_handler` will be called on every received CoAP response (including empty ACKs),
+/// with message ID, token and the message. It should return true if the response was expected, and
+/// false if not; this influences whether a CON will be responded to with an ACK or an RST.
+///
+/// Users should not rely on the message argument to the handler to be precisely the indicated
+/// type; it may change to any implementation of [coap_message::ReadableMessage].
+pub fn poll_with_response_handler<ST>(
+    stack: &mut ST,
+    socket: &mut ST::UdpSocket,
+    handler: &mut impl coap_handler::Handler,
+    response_handler: impl for<'a> FnOnce(
+        u16,
+        &'a [u8],
+        &'a coap_message_utils::inmemory::Message<'a>,
+    ) -> bool,
+) -> Result<(), ST::Error>
+where
+    ST: embedded_nal::UdpFullStack + ?Sized,
+{
     // Receive step
     let (extracted, addr, t_in, msgid, token) = {
         // too bad it needs to be initialized -- but see
@@ -127,10 +163,6 @@ where
         }
         let t_in = Type::from_u8((buf[0] >> 4) & 0x03)
             .expect("Success guaranteed by numberof variants and input size");
-        if t_in == Type::ACK || t_in == Type::RST {
-            // We're not a client and always respond piggy-backed, thus never expect ACKs or RSTs
-            return Ok(());
-        }
         let tkl = buf[0] & 0x0f;
         let tkl: usize = tkl.into();
         let code = buf[1];
@@ -150,8 +182,20 @@ where
         // Type of empty response to send in non-request cases
         let mut immediate_response = match t_in {
             Type::CON => Some(Type::RST),
-            _ => None
+            _ => None,
         };
+
+        let msg = coap_message_utils::inmemory::Message::new(code, tail);
+
+        if matches!(
+            coap_numbers::code::classify(code),
+            coap_numbers::code::Range::Response(_) | coap_numbers::code::Range::Empty
+        ) {
+            let was_expected = response_handler(msgid, &token, &msg);
+            if was_expected && t_in == Type::CON {
+                immediate_response = Some(Type::ACK)
+            }
+        }
 
         if !matches!(
             coap_numbers::code::classify(code),
@@ -167,7 +211,10 @@ where
             return Ok(());
         }
 
-        let msg = coap_message_utils::inmemory::Message::new(code, tail);
+        if t_in == Type::ACK || t_in == Type::RST {
+            // These should never be responses; ignoring them as protocol errors.
+            return Ok(());
+        }
 
         (handler.extract_request_data(&msg), addr, t_in, msgid, token)
     };

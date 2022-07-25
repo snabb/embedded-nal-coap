@@ -22,3 +22,4 @@ embedded-nal = "0.6"
 heapless = "^0.5"
 num-derive = { version = "^0.3", default-features = false }
 num-traits = { version = "^0.2", default-features = false }
+coap-numbers = "0.2.0"
