@@ -113,7 +113,7 @@ where
         let mut buf: [u8; MAX_SIZE] = [0; MAX_SIZE];
 
         let (len, addr) = stack.receive(socket, &mut buf)?;
-        let buf = &buf[..len];
+        let buf = &mut buf[..len];
 
         // All the UDP-specific format parsing
         if len < 4 {
@@ -146,6 +146,26 @@ where
             _ => return Ok(()),
         };
         let tail = &buf[4 + tkl..];
+
+        // Type of empty response to send in non-request cases
+        let mut immediate_response = match t_in {
+            Type::CON => Some(Type::RST),
+            _ => None
+        };
+
+        if !matches!(
+            coap_numbers::code::classify(code),
+            coap_numbers::code::Range::Request
+        ) {
+            // No high-level processing from the server side, but at least a RST should be set if
+            // indicated.
+            if let Some(t_response) = immediate_response {
+                let empty_tkl = 0;
+                buf[0] = (COAP_VERSION << 6) | (t_response.to_u8().unwrap() << 4) | empty_tkl;
+                stack.send_to(socket, addr, &buf[..4])?;
+            }
+            return Ok(());
+        }
 
         let msg = coap_message_utils::inmemory::Message::new(code, tail);
 
