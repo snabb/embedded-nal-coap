@@ -17,7 +17,7 @@ maintenance = { status = "experimental" }
 [dependencies]
 coap-message = "^0.2.0-alpha.0"
 coap-handler = "^0.1.0-alpha.0"
-coap-message-utils = "^0.1"
+coap-message-utils = "^0.2.1"
 embedded-nal = "0.6"
 heapless = "^0.5"
 num-derive = { version = "^0.3", default-features = false }
