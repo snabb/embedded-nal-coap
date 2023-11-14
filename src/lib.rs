@@ -352,7 +352,7 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         let mut buf = self.shared.buffer.borrow_mut();
 
         // FIXME use token length
-        let (mut header, mut tail) = buf.split_at_mut(6);
+        let (header, mut tail) = buf.split_at_mut(6);
         let mut message = message::Message::new(&mut header[1], &mut tail);
 
         let carry = request.build_request(&mut message).await;
