@@ -1,4 +1,0 @@
-test:nightly:
-  image: rustdocker/rust:nightly
-  script:
-  - cargo version && cargo build --all
