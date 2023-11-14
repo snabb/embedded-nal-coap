@@ -5,26 +5,29 @@
 //!
 //! An example of how to use this will be available as part of the [coap-message-demos] crate.
 //!
-//! * Open a UDP server socket that implements [embedded_nal_async::UnconnectedUdp]
+//! * Allocate a [CoAPShared] with a `CONCURRENT_REQUESTS` const of the number of outgoing requests
+//!   that should be servicable simultaneously.
 //!
-//! * If you want to run a server,
-//!   create a CoAP handler that implements [coap_handler::Handler]; the
-//!   [coap-handler-implementations] module contains some building blocks
-//!   (including some to combine handlers for individual resources into a handler that picks
-//!   sub-handlers from the URI path).
+//! * [CoAPShared::split()] that into a client and a server part.
 //!
-//! * If you want to send requests,
-//!   FIXME crate some kind of channel.
+//! * Use the client's [CoAPRuntimeClient::to()] method to create a [coap_request::Stack] that can
+//!   be used to send CoAP requests and receive a response. (Multiple responses, eg. from
+//!   observation, are planned but not implemented yet).
 //!
-//! * Pick an async executor suitable for your platform, and run a FIXME run() function as a task,
-//!   providing a UDP socket address and the inputs from above.
+//!   The [coap_request_implementations] crate contains suitable (albeit immature) building blocks
+//!   for constructing requests.
 //!
-//!   By applying the belowmentioned constraints and exercising some of the liberties designed into
-//!   CoAP, the server does not need to hold any state of its own.
-//!   (FIXME revisit)
+//! * Into the server's [CoAPRunner::run()] method, pass an unconnected [UDP
+//!   socket](embedded_nal_async::UnconnectedUdp), a source of low-grade entropy (for
+//!   retransmission jitter and that like) and a [CoAP server application](coap_handler::Handler).
 //!
-//! .. [coap-message-demos]: https://crates.io/crates/coap-message-demos
-//! .. [coap-handler-implementations]: https://crates.io/crates/coap-handler-implementations
+//!   The [coap_handler_implementations] crate contains suitable building blocks for constructing
+//!   such a server application (including some to combine handlers for individual resources into a
+//!   handler that picks sub-handlers from the URI path).
+//!
+//!   The future returned by the run function needs to be polled by an executor; note that it is
+//!   not Send, and some executors need configuration to allow that.
+//!
 //!
 //! Caveats
 //! -------
@@ -33,9 +36,18 @@
 //!   remote information); use this only in environments where this is acceptable (e.g. in closed
 //!   networks).
 //!
+//!   This will be mitigated in a future version.
+//!
 //!   FIXME only provide the 3x buffer for responses / when the handler indicates that it needs
 //!   more, 4.01 Echo? (The handler may be unhappy that it gets dropped; -handlers may need
 //!   guidance on this)
+//!
+//! * This server does not uphold NSTART and PROBING_RATE, the fundamental flow control parameters
+//!   of CoAP that make it OK for generic Internet applications.
+//!
+//!   This will be addressed in a future version.
+//!
+//!   FIXME pass in a time source
 //!
 //! * The server does not perform any message deduplication. All handler functions must therefore
 //!   be idempotent.
@@ -137,16 +149,17 @@ enum RequestState {
 }
 use RequestState::*;
 
-/// A CoAP main loop, which would typically run as a server and client simultaneously
+/// The shared state of a CoAP main loop, which would typically run as a server and client
+/// simultaneously.
+///
+/// This is usually created once and then [`.split()`] up into a client and a server part.
 ///
 /// Relevant generics:
-/// * `Socket` indicates which kind of UDP socket this will run on
-/// * `Handler` is the CoAP request handler type -- the application's implementation of a CoAP
-///   server
 /// * `CONCURRENT_REQUESTS` indicates how many requests may be outstanding simultaneously on the
-///   client side. Note that this distinct from `NSTART` in two ways: `NSTART` is counted per peer,
-///   and is decremented as soon as the request is ACK'ed.
-pub struct CoAPClient<const CONCURRENT_REQUESTS: usize> {
+///   client side. Note that this distinct from `NSTART` in two ways: `NSTART` is counted per peer
+///   (this is total), and is decremented as soon as the request is ACK'ed (this is until the
+///   (final) response has been processed).
+pub struct CoAPShared<const CONCURRENT_REQUESTS: usize> {
     // This is held by run (even, even mainly, particular across await points) except while it is
     // asking a specific request to act on it.
     buffer: core::cell::RefCell<[u8; MAX_SIZE]>,
@@ -165,14 +178,40 @@ pub struct CoAPClient<const CONCURRENT_REQUESTS: usize> {
         CONCURRENT_REQUESTS],
 }
 
+/// Access to the client side of a [CoAPShared]
+///
+/// From this, requests can be be started through the [`.to()`] method.
+///
+/// This is the "runtime" variant because it can be copied around arbitrarily, and requests made
+/// through it take any available of the `CONCURRENT_REQUESTS` slots.
+///
+/// Note that requests sent through this only make progress while the socket part of it is
+/// `[.run()]` (and being awaited).
+#[derive(Copy, Clone)]
+pub struct CoAPRuntimeClient<'a, const CONCURRENT_REQUESTS: usize> {
+    shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
+}
+
+/// Access to the server side of a [CoAPShared]
+///
+/// This needs to be [`.run()`] both in order to serve peers and to make progress on any
+/// requests issued through the CoAPRuntimeClient on the same Shared.
+pub struct CoAPRunner<'a, const CONCURRENT_REQUESTS: usize> {
+    shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
+}
+
 /// Parts of the `.run()` loop that are exclusively held
+/// Relevant generics:
+/// * `Socket` indicates which kind of UDP socket this will run on
+/// * `Handler` is the CoAP request handler type -- the application's implementation of a CoAP
+///   server
 struct RunParts<'a, Socket, Handler, RandomSource, const CONCURRENT_REQUESTS: usize>
 where
     Socket: embedded_nal_async::UnconnectedUdp + ?Sized,
     Handler: coap_handler::Handler,
     RandomSource: rand_core::RngCore,
 {
-    shared: &'a CoAPClient<CONCURRENT_REQUESTS>,
+    shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
 
     socket: &'a mut Socket,
     handler: &'a mut Handler,
@@ -188,7 +227,7 @@ where
     next_token: u16,
 }
 
-impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
+impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
     pub fn new() -> Self {
         // weird array initialization but OK
         const EMPTY_SIGNAL: embassy_sync::signal::Signal<
@@ -203,9 +242,30 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
         }
     }
 
-    /// FIXME
+    /// Split a CoAPShared into a client and a server/runner part.
     ///
-    /// If any receive error occurs, this terminates.
+    /// While technically both of them are just thin wrappers around a shared reference, this split
+    /// ensures that the otherwise-panicking constraints about who grabs which mutices when are
+    /// upheld.
+    pub fn split<'a>(
+        &'a self,
+    ) -> (
+        CoAPRuntimeClient<'a, CONCURRENT_REQUESTS>,
+        CoAPRunner<'a, CONCURRENT_REQUESTS>,
+    ) {
+        (
+            CoAPRuntimeClient { shared: self },
+            CoAPRunner { shared: self },
+        )
+    }
+}
+
+impl<'a, const CONCURRENT_REQUESTS: usize> CoAPRunner<'a, CONCURRENT_REQUESTS> {
+    /// Service the socket, sending any incoming requests to the handler, simultaneously taking
+    /// care to interact with the structures shared with the client parts to send out the requests
+    /// and file back the responses.
+    ///
+    /// If any error occurs on the socket, this terminates.
     pub async fn run<Socket, Handler, RandomSource>(
         &self,
         socket: &mut Socket,
@@ -222,7 +282,7 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
         let next_token = start_values as u16;
 
         let mut run_parts = RunParts {
-            shared: &self,
+            shared: self.shared,
             socket,
             handler,
             next_mid,
@@ -232,7 +292,9 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
 
         run_parts.run().await
     }
+}
 
+impl<'a, const CONCURRENT_REQUESTS: usize> CoAPRuntimeClient<'a, CONCURRENT_REQUESTS> {
     /// Set up a request to a particular network peer
     ///
     /// This starts off a builder that (as of now) is immediately usable as a
@@ -242,17 +304,17 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
     /// FIXME: Currently, requests set up this way are sent as CONs but without retransmission.
     pub fn to(&self, address: SocketAddr) -> RequestingCoAPClient<'_, CONCURRENT_REQUESTS> {
         RequestingCoAPClient {
-            shared: self,
+            shared: self.shared,
             address,
         }
     }
 }
 
-/// The actual [coap_request::Stack] implementation derived from a [CoAPClient] by putting in an
+/// The actual [coap_request::Stack] implementation derived from a [CoAPShared] by putting in an
 /// address through `.to()`.
 pub struct RequestingCoAPClient<'a, const CONCURRENT_REQUESTS: usize> {
     address: SocketAddr,
-    shared: &'a CoAPClient<CONCURRENT_REQUESTS>,
+    shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
 }
 
 #[derive(Debug)]

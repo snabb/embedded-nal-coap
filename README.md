@@ -9,26 +9,29 @@ Usage and operation
 
 An example of how to use this will be available as part of the [coap-message-demos] crate.
 
-* Open a UDP server socket that implements [embedded_nal_async::UnconnectedUdp]
+* Allocate a [CoAPShared] with a `CONCURRENT_REQUESTS` const of the number of outgoing requests
+  that should be servicable simultaneously.
 
-* If you want to run a server,
-  create a CoAP handler that implements [coap_handler::Handler]; the
-  [coap-handler-implementations] module contains some building blocks
-  (including some to combine handlers for individual resources into a handler that picks
-  sub-handlers from the URI path).
+* [CoAPShared::split()] that into a client and a server part.
 
-* If you want to send requests,
-  FIXME crate some kind of channel.
+* Use the client's [CoAPRuntimeClient::to()] method to create a [coap_request::Stack] that can
+  be used to send CoAP requests and receive a response. (Multiple responses, eg. from
+  observation, are planned but not implemented yet).
 
-* Pick an async executor suitable for your platform, and run a FIXME run() function as a task,
-  providing a UDP socket address and the inputs from above.
+  The [coap_request_implementations] crate contains suitable (albeit immature) building blocks
+  for constructing requests.
 
-  By applying the belowmentioned constraints and exercising some of the liberties designed into
-  CoAP, the server does not need to hold any state of its own.
-  (FIXME revisit)
+* Into the server's [CoAPRunner::run()] method, pass an unconnected [UDP
+  socket](embedded_nal_async::UnconnectedUdp), a source of low-grade entropy (for
+  retransmission jitter and that like) and a [CoAP server application](coap_handler::Handler).
 
-.. [coap-message-demos]: https://crates.io/crates/coap-message-demos
-.. [coap-handler-implementations]: https://crates.io/crates/coap-handler-implementations
+  The [coap_handler_implementations] crate contains suitable building blocks for constructing
+  such a server application (including some to combine handlers for individual resources into a
+  handler that picks sub-handlers from the URI path).
+
+  The future returned by the run function needs to be polled by an executor; note that it is
+  not Send, and some executors need configuration to allow that.
+
 
 Caveats
 -------
@@ -37,9 +40,18 @@ Caveats
   remote information); use this only in environments where this is acceptable (e.g. in closed
   networks).
 
+  This will be mitigated in a future version.
+
   FIXME only provide the 3x buffer for responses / when the handler indicates that it needs
   more, 4.01 Echo? (The handler may be unhappy that it gets dropped; -handlers may need
   guidance on this)
+
+* This server does not uphold NSTART and PROBING_RATE, the fundamental flow control parameters
+  of CoAP that make it OK for generic Internet applications.
+
+  This will be addressed in a future version.
+
+  FIXME pass in a time source
 
 * The server does not perform any message deduplication. All handler functions must therefore
   be idempotent.
