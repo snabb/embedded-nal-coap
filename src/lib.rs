@@ -233,10 +233,14 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
         run_parts.run().await
     }
 
-    pub fn request_from(
-        &self,
-        address: SocketAddr,
-    ) -> RequestingCoAPClient<'_, CONCURRENT_REQUESTS> {
+    /// Set up a request to a particular network peer
+    ///
+    /// This starts off a builder that (as of now) is immediately usable as a
+    /// [coap_request::Stack]; on the long run, this may gain extra builder steps (such as a
+    /// `.reliably()` or `.unreliably()`), or more diverse peers for better control.
+    ///
+    /// FIXME: Currently, requests set up this way are sent as CONs but without retransmission.
+    pub fn to(&self, address: SocketAddr) -> RequestingCoAPClient<'_, CONCURRENT_REQUESTS> {
         RequestingCoAPClient {
             shared: self,
             address,
@@ -245,7 +249,7 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPClient<CONCURRENT_REQUESTS> {
 }
 
 /// The actual [coap_request::Stack] implementation derived from a [CoAPClient] by putting in an
-/// address through `.request_from()`.
+/// address through `.to()`.
 pub struct RequestingCoAPClient<'a, const CONCURRENT_REQUESTS: usize> {
     address: SocketAddr,
     shared: &'a CoAPClient<CONCURRENT_REQUESTS>,
