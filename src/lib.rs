@@ -232,7 +232,8 @@ where
     rand: &'a mut RandomSource,
 
     // FIXME: There is time stuff involved actually -- not sending 64k messages within short times,
-    // and outbound rate limiting. No clue how to do that yet.
+    // and outbound rate limiting. This probably becomes trivial when applying NSTART and
+    // PROBING_RATE, and anything that has sub-ms RTTs is probably special enough.
     // FIXME: While they were still locals of the loop() function we could imagine they wouldn't
     // even be used when there are no ways to get requests; now, should we do away with their
     // storage when not sending as a client?
@@ -313,7 +314,8 @@ impl<'a, const CONCURRENT_REQUESTS: usize> CoAPRuntimeClient<'a, CONCURRENT_REQU
     ///
     /// This starts off a builder that (as of now) is immediately usable as a
     /// [coap_request::Stack]; on the long run, this may gain extra builder steps (such as a
-    /// `.reliably()` or `.unreliably()`), or more diverse peers for better control.
+    /// `.reliably()` or `.unreliably()`, or `.longrunning()` to tap into a larger token space), or
+    /// more diverse `.to_...()` methods for better control.
     ///
     /// FIXME: Currently, requests set up this way are sent as CONs but without retransmission.
     pub fn to(&self, address: SocketAddr) -> RequestingCoAPClient<'_, CONCURRENT_REQUESTS> {
@@ -411,7 +413,8 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         };
         drop(requests);
 
-        // FIXME: There is overhead in running this twice. Should we pass indices?
+        // FIXME: There is overhead in running this twice. Should we pass indices? Or just parse
+        // result that incorporates an AsRef<[u8]> that is the locked buffer?
         let Ok((_msgtype, _token, msg)) = udp_format::parse::<TKL_MAX>(&buf[..len]) else {
             unreachable!("Message was parsed once already");
         };
