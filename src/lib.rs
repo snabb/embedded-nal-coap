@@ -136,6 +136,7 @@ enum RequestState {
     /// The application component is done filling the buffer
     BufferFilled {
         details: RequestMatchingDetails,
+        /// Bytes in the buffer
         len: usize,
     },
 
@@ -144,7 +145,11 @@ enum RequestState {
 
     /// This is the loop sets once a response has arrived. Once the client is done, it needs to
     /// signal through `.app_to_loop`.
-    ResponsePending(RequestMatchingDetails),
+    // len? Or indices? (see also `.request()` comments)
+    ResponsePending {
+        details: RequestMatchingDetails,
+        len: usize,
+    },
     // After that, the client either sets Empty or RequestSent.
 }
 use RequestState::*;
@@ -176,6 +181,14 @@ pub struct CoAPShared<const CONCURRENT_REQUESTS: usize> {
     // There has to be a better way than MAX_SIZE signals)
     loop_to_app: [embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, ()>;
         CONCURRENT_REQUESTS],
+    // Signalled when the loop sets any slot to Empty. This is a stopgap measure against failing
+    // when more requests than CONCURRENT_REQUESTS should be sent. Should be avoided, though, as
+    // it's not a queue, and signaling it will cause something like the stampeding herd problem.
+    //
+    // We could signal the slot number here, but frankly, that wouldn't simplify code, and
+    // efficiency is out in this case already.
+    request_became_empty:
+        embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, ()>,
 }
 
 /// Access to the client side of a [CoAPShared]
@@ -239,6 +252,7 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
             requests: [Empty; CONCURRENT_REQUESTS].into(),
             app_to_loop: Default::default(),
             loop_to_app: [EMPTY_SIGNAL; CONCURRENT_REQUESTS].into(),
+            request_became_empty: Default::default(),
         }
     }
 
@@ -335,21 +349,39 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         &mut self,
         mut request: Req,
     ) -> Result<Req::Output, TransportError> {
-        // FIXME hardcoded number
-        let mut requests = self.shared.requests.borrow_mut();
-        requests[0] = AllocateRequest {
-            remote: self.address,
-        };
-        drop(requests);
-        self.shared.app_to_loop.signal(());
+        let slot;
+        'found: loop {
+            let mut requests = self.shared.requests.borrow_mut();
+            for (i, request) in requests.iter_mut().enumerate() {
+                if matches!(*request, Empty) {
+                    *request = AllocateRequest {
+                        remote: self.address,
+                    };
+                    drop(requests);
+                    self.shared.app_to_loop.signal(());
+                    slot = i;
+                    break 'found;
+                }
+            }
+            drop(requests);
+            self.shared.request_became_empty.wait().await;
+        }
 
-        self.shared.loop_to_app[0].wait().await;
-        let mut requests = self.shared.requests.borrow_mut();
-        let FillBuffer(details) = requests[0] else {
-            panic!("Lockstep violation");
-        };
+        self.shared.loop_to_app[slot].wait().await;
+        // We're blocking the CoAP thread now. While we're allowed to keep the buffer across that,
+        // we can't keep requests across await points (other clients may want to enqueue their
+        // requests there), but we don't need to leave requests[slot] in any sensible state because
+        // we're "owning" that now.
 
         let mut buf = self.shared.buffer.borrow_mut();
+
+        let requests = self.shared.requests.borrow();
+        let FillBuffer(details) = requests[slot] else {
+            panic!(
+                "Lockstep violation: Runner signalled us even though it did not give us the buffer"
+            );
+        };
+        drop(requests);
 
         // FIXME use token length
         let (header, mut tail) = buf.split_at_mut(6);
@@ -358,15 +390,27 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         let carry = request.build_request(&mut message).await;
         let len = message.finish();
 
-        requests[0] = BufferFilled { details, len };
-        drop(buf);
+        let mut requests = self.shared.requests.borrow_mut();
+        requests[slot] = BufferFilled { details, len };
         drop(requests);
 
+        drop(buf);
+
+        // Not blocking any more after this
         self.shared.app_to_loop.signal(());
 
-        self.shared.loop_to_app[0].wait().await;
+        self.shared.loop_to_app[slot].wait().await;
+        // Once more, we have exclusive control of the buffer while we're reading, and we block the
+        // runner; as before, requests are not to be held across await.
 
         let buf = self.shared.buffer.borrow();
+
+        let requests = self.shared.requests.borrow();
+        let ResponsePending { len, .. } = requests[slot] else {
+            panic!("Lockstep violation: Runner signalled us even though no response is pending");
+        };
+        drop(requests);
+
         // FIXME: There is overhead in running this twice. Should we pass indices?
         let Ok((_msgtype, _token, msg)) = udp_format::parse::<TKL_MAX>(&buf[..len]) else {
             unreachable!("Message was parsed once already");
@@ -375,7 +419,9 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         let response = request.process_response(&msg, carry).await;
 
         let mut requests = self.shared.requests.borrow_mut();
-        requests[0] = Empty;
+        requests[slot] = Empty;
+        drop(requests);
+        self.shared.request_became_empty.signal(());
         self.shared.app_to_loop.signal(());
 
         Ok(response)
@@ -389,7 +435,7 @@ where
     Handler: coap_handler::Handler,
     RandomSource: rand_core::RngCore,
 {
-    pub async fn run(&mut self) -> Result<(), Socket::Error> {
+    async fn run(&mut self) -> Result<(), Socket::Error> {
         loop {
             let mut buf = self.shared.buffer.borrow_mut();
             // Receive step
@@ -451,7 +497,7 @@ where
                     drop(buf);
                     if let ProcessResponseThenAck(slot) | ProcessResponseThenSilent(slot) = &action
                     {
-                        self.handle_response(*slot).await;
+                        self.handle_response(*slot, len).await;
                     };
                     let mut buf = self.shared.buffer.borrow_mut();
 
@@ -591,22 +637,33 @@ where
     }
 
     /// Returns true if the response was expected
-    async fn handle_response(&mut self, slot: usize) {
+    async fn handle_response(&mut self, slot: usize, len: usize) {
         let mut requests = self.shared.requests.borrow_mut();
         let RequestSent(details) = requests[slot] else {
             unreachable!();
         };
-        requests[slot] = ResponsePending(details);
+        requests[slot] = ResponsePending { details, len };
         drop(requests);
 
         self.shared.loop_to_app[slot].signal(());
-        // Across here we should only have the slot number as a local variable
-        self.shared.app_to_loop.wait().await;
-        // FIXME: Actually, there could be any reason, plus we'd really need to clear: So
-        // we should loop, clearing the signal, while our buffer is not BufferFilled, and
-        // then at any rate signal again so that we don't lose signals.
-
-        // Not checking whether this was left Empty or RequestSent -- either way, we
-        // processed it, and are done.
+        loop {
+            // Across here we should only have the slot number as a local variable
+            self.shared.app_to_loop.wait().await;
+            let requests = self.shared.requests.borrow();
+            if let ResponsePending { .. } = requests[slot] {
+                // Something else sent a signal
+                continue;
+            } else {
+                // Not caring for the moment if it was Empty or RequestSent -- the latter would be
+                // useful for observations and other non-traditional responses, but our client
+                // doesn't do that yet.
+                break;
+            }
+        }
+        // Signaling self no matter whether ResponsePending was found inbetween or not -- even if,
+        // the app_to_loop.await() we just did could have masked another client tasks's request to
+        // allocate something, and signalling self is easier than setting up a flag and an extra
+        // code path.
+        self.shared.app_to_loop.signal(());
     }
 }
