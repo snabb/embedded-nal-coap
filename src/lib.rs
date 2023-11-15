@@ -351,6 +351,23 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         &mut self,
         mut request: Req,
     ) -> Result<Req::Output, TransportError> {
+        /// The clean-up code of this function lives in this guard's Drop. It ensures that even if
+        /// the request is dropped prematurely, the runner will not try to wake up a task that's
+        /// not expecting responses any more anyway, and that the slot does not get leaked.
+        struct DropGuard<'a, const CONCURRENT_REQUESTS: usize> {
+            shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
+            slot: usize,
+        };
+        impl<'a, const CONCURRENT_REQUESTS: usize> Drop for DropGuard<'a, CONCURRENT_REQUESTS> {
+            fn drop(&mut self) {
+                let mut requests = self.shared.requests.borrow_mut();
+                requests[self.slot] = Empty;
+                drop(requests);
+                self.shared.request_became_empty.signal(());
+                self.shared.app_to_loop.signal(());
+            }
+        }
+
         let slot;
         'found: loop {
             let mut requests = self.shared.requests.borrow_mut();
@@ -368,6 +385,13 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
             drop(requests);
             self.shared.request_became_empty.wait().await;
         }
+
+        // We're in control of that slot, but if our execution does get dropped, let's not block
+        // that one forever.
+        let make_empty = DropGuard {
+            shared: self.shared,
+            slot,
+        };
 
         self.shared.loop_to_app[slot].wait().await;
         // We're blocking the CoAP thread now. While we're allowed to keep the buffer across that,
@@ -421,11 +445,11 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
 
         let response = request.process_response(&msg, carry).await;
 
-        let mut requests = self.shared.requests.borrow_mut();
-        requests[slot] = Empty;
-        drop(requests);
-        self.shared.request_became_empty.signal(());
-        self.shared.app_to_loop.signal(());
+        drop(buf);
+
+        // Run cleanup-up code, setting requests[slot] to Empty and signalling the runner that it
+        // owns the buffer again.
+        drop(make_empty);
 
         Ok(response)
     }
