@@ -86,7 +86,7 @@ use embedded_nal_async::SocketAddr;
 const MAX_SIZE: usize = 1152;
 
 // FIXME make configurable
-const TKL_MAX: usize = 32;
+const TKL_MAX: usize = 8;
 
 // If we went with a second buffer to be able to send 5.03s early on, that'd need to be sized to
 // the maximum of token length we support
