@@ -106,6 +106,7 @@ enum Extracted<R> {
 }
 use Extracted::*;
 
+/// Properties by which the state associated with a pending outgoing request is mached
 // Copy and Clone are mainly there because this makes it easier to pass this around while going
 // through the state machine of RequestState
 #[derive(Copy, Clone, Debug)]
@@ -117,6 +118,7 @@ struct RequestMatchingDetails {
     token: u16,
 }
 
+/// State in which any of the slots used for outoging requests can be
 // Copy and Clone are mainly there because this makes it easier to pass this around while going
 // through the state machine
 #[derive(Copy, Clone, Debug)]
@@ -178,7 +180,7 @@ pub struct CoAPShared<const CONCURRENT_REQUESTS: usize> {
     // FIXME is NoopRawLoop safe in the presence of any executor?
     app_to_loop: embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, ()>,
     // When run() needs anything from the client application, it pings it through this (FIXME:
-    // There has to be a better way than MAX_SIZE signals)
+    // There has to be a better way than CONCURRENT_REQUESTS signals)
     loop_to_app: [embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, ()>;
         CONCURRENT_REQUESTS],
     // Signalled when the loop sets any slot to Empty. This is a stopgap measure against failing
