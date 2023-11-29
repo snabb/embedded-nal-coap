@@ -615,11 +615,14 @@ where
             }
         };
 
-        drop(buf);
-        if let ProcessResponseThenAck(slot) | ProcessResponseThenSilent(slot) = &action {
-            self.handle_response(*slot, len).await;
+        let mut buf = match &action {
+            ProcessResponseThenAck(slot) | ProcessResponseThenSilent(slot) => {
+                drop(buf);
+                self.handle_response(*slot, len).await;
+                self.shared.buffer.borrow_mut()
+            }
+            _ => buf,
         };
-        let mut buf = self.shared.buffer.borrow_mut();
 
         // Send step
         let (responsetype, tkl, written) = match action {
