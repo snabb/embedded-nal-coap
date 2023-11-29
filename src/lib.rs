@@ -71,13 +71,12 @@
 #![no_std]
 
 mod udp_format;
+mod udp_read;
+mod udp_write;
 
-use udp_format::ParseError::*;
-use udp_format::Type::*;
-use udp_format::{
-    finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage,
-    ParsedMessage, Type,
-};
+use udp_format::Type::{self, *};
+use udp_read::{ParseError::*, ParsedMessage};
+use udp_write::{finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage};
 
 use coap_message::ReadableMessage;
 use embedded_nal_async::SocketAddr;
@@ -440,7 +439,7 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
 
         // FIXME: There is overhead in running this twice. Should we pass indices? Or just parse
         // result that incorporates an AsRef<[u8]> that is the locked buffer?
-        let Ok(ParsedMessage { message, .. }) = udp_format::parse::<TKL_MAX>(&buf[..len]) else {
+        let Ok(ParsedMessage { message, .. }) = udp_read::parse::<TKL_MAX>(&buf[..len]) else {
             unreachable!("Message was parsed once already");
         };
 
@@ -570,7 +569,7 @@ where
         local: SocketAddr,
         remote: SocketAddr,
     ) -> Result<(), Socket::Error> {
-        let action = match udp_format::parse::<TKL_MAX>(&buf[..len]) {
+        let action = match udp_read::parse::<TKL_MAX>(&buf[..len]) {
             Err(MessageTooShort | WrongVersion) => Silent,
             Err(TokenTooLong { msgtype: CON }) => JustRst,
             Err(TokenTooLong { msgtype: _ }) => Silent,
