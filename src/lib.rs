@@ -486,96 +486,7 @@ where
                 embassy_futures::select::Either::Second(receive_result) => {
                     let (len, local, remote) = receive_result?;
 
-                    let action = match udp_format::parse::<TKL_MAX>(&buf[..len]) {
-                        Err(MessageTooShort | WrongVersion) => Silent,
-                        Err(TokenTooLong { msgtype: CON }) => JustRst,
-                        Err(TokenTooLong { msgtype: _ }) => Silent,
-                        Ok(ParsedMessage {
-                            msgtype,
-                            token,
-                            message,
-                        }) => {
-                            match coap_numbers::code::classify(message.code()) {
-                                coap_numbers::code::Range::Response(_)
-                                | coap_numbers::code::Range::Empty => {
-                                    // FIXME: If the response is coming in on a RST, we should probably not
-                                    // even bother the message handler. (Well at least it should cancel
-                                    // retransmissions, so it probably *should* go in there).
-
-                                    match (msgtype, self.match_to_slot(&buf[..], &token)) {
-                                        (CON, Some(slot)) => ProcessResponseThenAck(slot),
-                                        (CON, None) => JustRst,
-                                        (_, Some(slot)) => ProcessResponseThenSilent(slot),
-                                        (_, None) => Silent,
-                                    }
-                                }
-                                coap_numbers::code::Range::Request => {
-                                    let action = if msgtype == ACK || msgtype == RST {
-                                        // These should never be responses; ignoring them as protocol errors.
-                                        Silent
-                                    } else {
-                                        ReactTo {
-                                            msgtype,
-                                            token: token
-                                                .try_into()
-                                                .expect("TKL was suitably constrained"),
-                                            extracted: self.handler.extract_request_data(&message),
-                                        }
-                                    };
-                                    action
-                                }
-                                _ => Silent,
-                            }
-                        }
-                    };
-
-                    drop(buf);
-                    if let ProcessResponseThenAck(slot) | ProcessResponseThenSilent(slot) = &action
-                    {
-                        self.handle_response(*slot, len).await;
-                    };
-                    let mut buf = self.shared.buffer.borrow_mut();
-
-                    // Send step
-                    let (responsetype, tkl, written) = match action {
-                        ReactTo {
-                            msgtype,
-                            token,
-                            extracted,
-                        } => {
-                            // FIXME can we even leave the token in place?
-                            // buf[4..4 + token.len()].copy_from_slice(&token);
-                            let (header, tokentail) = buf.split_at_mut(4);
-                            let code = &mut header[1];
-                            let tail = &mut tokentail[token.len()..];
-
-                            // FIXME amplification mitigation
-
-                            let mut message = message::Message::new(code, tail);
-                            self.handler.build_response(&mut message, extracted);
-                            let written = 4 + token.len() + message.finish();
-                            let responsetype = match msgtype {
-                                CON => ACK,
-                                _ => NON,
-                            };
-                            (responsetype, token.len(), written)
-                        }
-                        JustRst => {
-                            buf[1] = coap_numbers::code::EMPTY;
-                            (RST, 0, 4)
-                        }
-                        JustAck | ProcessResponseThenAck(_) => {
-                            buf[1] = coap_numbers::code::EMPTY;
-                            (ACK, 0, 4)
-                        }
-                        Silent | ProcessResponseThenSilent(_) => continue,
-                    };
-                    // FIXME move to udp_format, and allow longer token lengths
-                    let COAP_VERSION = 1;
-                    buf[0] = (COAP_VERSION << 6) | ((responsetype as u8) << 4) | (tkl as u8);
-                    // buf[2..4] left in place
-
-                    self.socket.send(local, remote, &buf[..written]).await?;
+                    self.process_incoming(buf, len, local, remote).await?;
                 }
             };
         }
@@ -651,6 +562,106 @@ where
                 self.send_request(slot).await?;
             }
         }
+        Ok(())
+    }
+
+    /// A message has arrived.
+    ///
+    /// Process it as a request or response, sending any response, RST or ACK as needed.
+    async fn process_incoming(
+        &mut self,
+        buf: core::cell::RefMut<'_, [u8; MAX_SIZE]>,
+        len: usize,
+        local: SocketAddr,
+        remote: SocketAddr,
+    ) -> Result<(), Socket::Error> {
+        let action = match udp_format::parse::<TKL_MAX>(&buf[..len]) {
+            Err(MessageTooShort | WrongVersion) => Silent,
+            Err(TokenTooLong { msgtype: CON }) => JustRst,
+            Err(TokenTooLong { msgtype: _ }) => Silent,
+            Ok(ParsedMessage {
+                msgtype,
+                token,
+                message,
+            }) => {
+                match coap_numbers::code::classify(message.code()) {
+                    coap_numbers::code::Range::Response(_) | coap_numbers::code::Range::Empty => {
+                        // FIXME: If the response is coming in on a RST, we should probably not
+                        // even bother the message handler. (Well at least it should cancel
+                        // retransmissions, so it probably *should* go in there).
+
+                        match (msgtype, self.match_to_slot(&buf[..], &token)) {
+                            (CON, Some(slot)) => ProcessResponseThenAck(slot),
+                            (CON, None) => JustRst,
+                            (_, Some(slot)) => ProcessResponseThenSilent(slot),
+                            (_, None) => Silent,
+                        }
+                    }
+                    coap_numbers::code::Range::Request => {
+                        let action = if msgtype == ACK || msgtype == RST {
+                            // These should never be responses; ignoring them as protocol errors.
+                            Silent
+                        } else {
+                            ReactTo {
+                                msgtype,
+                                token: token.try_into().expect("TKL was suitably constrained"),
+                                extracted: self.handler.extract_request_data(&message),
+                            }
+                        };
+                        action
+                    }
+                    _ => Silent,
+                }
+            }
+        };
+
+        drop(buf);
+        if let ProcessResponseThenAck(slot) | ProcessResponseThenSilent(slot) = &action {
+            self.handle_response(*slot, len).await;
+        };
+        let mut buf = self.shared.buffer.borrow_mut();
+
+        // Send step
+        let (responsetype, tkl, written) = match action {
+            ReactTo {
+                msgtype,
+                token,
+                extracted,
+            } => {
+                // FIXME can we even leave the token in place?
+                // buf[4..4 + token.len()].copy_from_slice(&token);
+                let (header, tokentail) = buf.split_at_mut(4);
+                let code = &mut header[1];
+                let tail = &mut tokentail[token.len()..];
+
+                // FIXME amplification mitigation
+
+                let mut message = message::Message::new(code, tail);
+                self.handler.build_response(&mut message, extracted);
+                let written = 4 + token.len() + message.finish();
+                let responsetype = match msgtype {
+                    CON => ACK,
+                    _ => NON,
+                };
+                (responsetype, token.len(), written)
+            }
+            JustRst => {
+                buf[1] = coap_numbers::code::EMPTY;
+                (RST, 0, 4)
+            }
+            JustAck | ProcessResponseThenAck(_) => {
+                buf[1] = coap_numbers::code::EMPTY;
+                (ACK, 0, 4)
+            }
+            Silent | ProcessResponseThenSilent(_) => return Ok(()),
+        };
+        // FIXME move to udp_format, and allow longer token lengths
+        let COAP_VERSION = 1;
+        buf[0] = (COAP_VERSION << 6) | ((responsetype as u8) << 4) | (tkl as u8);
+        // buf[2..4] left in place
+
+        self.socket.send(local, remote, &buf[..written]).await?;
+
         Ok(())
     }
 
