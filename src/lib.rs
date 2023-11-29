@@ -70,12 +70,14 @@
 //! single buffer or an at-least-1-sized pool that gets locked by the tasks).
 #![no_std]
 
-mod message;
 mod udp_format;
 
 use udp_format::ParseError::*;
 use udp_format::Type::*;
-use udp_format::{ParsedMessage, Type};
+use udp_format::{
+    finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage,
+    ParsedMessage, Type,
+};
 
 use coap_message::ReadableMessage;
 use embedded_nal_async::SocketAddr;
@@ -138,8 +140,8 @@ enum RequestState {
     /// The application component is done filling the buffer
     BufferFilled {
         details: RequestMatchingDetails,
-        /// Bytes in the buffer
-        len: usize,
+        /// Output of build_outgoing
+        written: MessageWritten,
     },
 
     /// State while the loop is awaiting a response
@@ -411,15 +413,12 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         };
         drop(requests);
 
-        // FIXME use token length
-        let (header, mut tail) = buf.split_at_mut(6);
-        let mut message = message::Message::new(&mut header[1], &mut tail);
-
-        let carry = request.build_request(&mut message).await;
-        let len = message.finish();
+        let mut outgoing = OutgoingRequestMessage::new(buf.as_mut());
+        let carry = request.build_request(outgoing.message()).await;
+        let written = outgoing.done();
 
         let mut requests = self.shared.requests.borrow_mut();
-        requests[slot] = BufferFilled { details, len };
+        requests[slot] = BufferFilled { details, written };
         drop(requests);
 
         drop(buf);
@@ -502,17 +501,13 @@ where
         // then at any rate signal again so that we don't lose signals.
 
         let mut requests = self.shared.requests.borrow_mut();
-        let BufferFilled { details, len } = &requests[slot] else {
+        let BufferFilled { details, written } = &requests[slot] else {
             // FIXME: allow it to declare that it has changed its mind
             panic!("Sequence violation by client");
         };
 
         let mut buf = self.shared.buffer.borrow_mut();
-        // Our buffer preparation... FIXME do through the udp_format module
-        buf[0] = 0x42;
-        buf[2..4].copy_from_slice(&details.mid.to_be_bytes());
-        buf[4..6].copy_from_slice(&details.token.to_be_bytes());
-        let len = 6 + len;
+        let len = finish_outgoing(buf.as_mut(), true, details.mid, details.token, *written);
 
         // FIXME can this be any-protocol?
         const SOCK_UNSPEC: SocketAddr = SocketAddr::new(
@@ -625,43 +620,37 @@ where
         };
 
         // Send step
-        let (responsetype, tkl, written) = match action {
+        let written = match action {
             ReactTo {
                 msgtype,
                 token,
                 extracted,
             } => {
-                // FIXME can we even leave the token in place?
-                // buf[4..4 + token.len()].copy_from_slice(&token);
-                let (header, tokentail) = buf.split_at_mut(4);
-                let code = &mut header[1];
-                let tail = &mut tokentail[token.len()..];
-
-                // FIXME amplification mitigation
-
-                let mut message = message::Message::new(code, tail);
-                self.handler.build_response(&mut message, extracted);
-                let written = 4 + token.len() + message.finish();
                 let responsetype = match msgtype {
                     CON => ACK,
                     _ => NON,
                 };
-                (responsetype, token.len(), written)
+
+                // Note that we never really use token, but that may change when we start async'ing
+                // the server side (FIXME: does it pay to reduce token to its tkl parts if all we
+                // do is go back later anyway?)
+                let mut outgoing = OutgoingResponseMessage::new::<TKL_MAX>(
+                    buf.as_mut(),
+                    responsetype,
+                    token.len(),
+                );
+
+                // FIXME amplification mitigation
+
+                self.handler.build_response(outgoing.message(), extracted);
+                outgoing.done()
             }
-            JustRst => {
-                buf[1] = coap_numbers::code::EMPTY;
-                (RST, 0, 4)
-            }
+            JustRst => OutgoingResponseMessage::empty(buf.as_mut(), RST),
             JustAck | ProcessResponseThenAck(_) => {
-                buf[1] = coap_numbers::code::EMPTY;
-                (ACK, 0, 4)
+                OutgoingResponseMessage::empty(buf.as_mut(), ACK)
             }
             Silent | ProcessResponseThenSilent(_) => return Ok(()),
         };
-        // FIXME move to udp_format, and allow longer token lengths
-        let COAP_VERSION = 1;
-        buf[0] = (COAP_VERSION << 6) | ((responsetype as u8) << 4) | (tkl as u8);
-        // buf[2..4] left in place
 
         self.socket.send(local, remote, &buf[..written]).await?;
 
