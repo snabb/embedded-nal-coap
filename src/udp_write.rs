@@ -118,3 +118,68 @@ pub(crate) fn finish_outgoing(
 
     written.0 + 6
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const GET_HELLO: [u8; 12] = [
+        0x52, 1, 0x12, 0x34, 0x56, 0x78, 0xb5, 'h' as _, 'e' as _, 'l' as _, 'l' as _, 'o' as _,
+    ];
+
+    #[test]
+    fn test_request() {
+        let mut buf = [0; 128];
+
+        let mut out = OutgoingRequestMessage::new(&mut buf);
+        let msg = out.message();
+        use coap_message::MinimalWritableMessage;
+        msg.set_code(coap_numbers::code::GET);
+        msg.add_option(coap_numbers::option::URI_PATH.try_into().unwrap(), b"hello");
+        let done = out.done();
+        let written = finish_outgoing(&mut buf, false, 0x1234, 0x5678, done);
+        assert_eq!(&buf[..written], &GET_HELLO);
+    }
+
+    #[test]
+    fn test_response() {
+        let mut buf = GET_HELLO;
+
+        let mut out = OutgoingResponseMessage::new::<2>(&mut buf, Type::ACK, 2);
+        let msg = out.message();
+        use coap_message::MinimalWritableMessage;
+        msg.set_code(coap_numbers::code::CONTENT);
+        msg.set_payload(b"World");
+        let written = out.done();
+        assert_eq!(
+            &buf[..written],
+            &[
+                0x62, 0x45, 0x12, 0x34, 0x56, 0x78, 0xff, 'W' as _, 'o' as _, 'r' as _, 'l' as _,
+                'd' as _
+            ]
+        );
+    }
+
+    #[test]
+    fn test_response_longertoken() {
+        let orig_buf = [
+            0x5d, 1, 0x12, 0x34, 0x01, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+            /* uninitialized */ 0xff, 0xff,
+        ];
+        let mut buf = orig_buf;
+        let mut manual_comparison_buf = orig_buf;
+
+        let mut out = OutgoingResponseMessage::new::<20>(&mut buf, Type::ACK, 13);
+        let msg = out.message();
+        use coap_message::MinimalWritableMessage;
+        msg.set_code(coap_numbers::code::CONTENT);
+        msg.set_payload(b"x");
+        let written = out.done();
+
+        manual_comparison_buf[0] = 0x6d;
+        manual_comparison_buf[1] = 0x45;
+        manual_comparison_buf[18] = 0xff;
+        manual_comparison_buf[19] = 'x' as _;
+        assert_eq!(&buf[..written], &manual_comparison_buf);
+    }
+}
