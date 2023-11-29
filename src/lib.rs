@@ -575,6 +575,7 @@ where
             Err(TokenTooLong { msgtype: _ }) => Silent,
             Ok(ParsedMessage {
                 msgtype,
+                msgid,
                 token,
                 message,
             }) => {
@@ -584,7 +585,7 @@ where
                         // even bother the message handler. (Well at least it should cancel
                         // retransmissions, so it probably *should* go in there).
 
-                        match (msgtype, self.match_to_slot(&buf[..], &token)) {
+                        match (msgtype, self.match_to_slot(msgtype, msgid, &token)) {
                             (CON, Some(slot)) => ProcessResponseThenAck(slot),
                             (CON, None) => JustRst,
                             (_, Some(slot)) => ProcessResponseThenSilent(slot),
@@ -656,16 +657,25 @@ where
         Ok(())
     }
 
-    fn match_to_slot(&mut self, buf: &[u8], token: &[u8]) -> Option<usize> {
-        let mid = u16::from_be_bytes(buf[2..4].try_into().unwrap());
+    fn match_to_slot(&mut self, msgtype: Type, mid: u16, token: &[u8]) -> Option<usize> {
+        // FIXME Should we check for the address as well? That'd require reliable determination of
+        // being multicast.
 
+        // If it's not 2-byte we didn't send it.
         let token = u16::from_be_bytes(token[..].try_into().ok()?);
 
         let requests = self.shared.requests.borrow();
         for (slot, r) in requests.iter().enumerate() {
             if let RequestSent(details) = r {
-                // FIXME check MID on piggybacked, as `details.mid == msgid &&`?
+                // This includes piggy-backed ACKs w/o token, and RSTs, neither of which contain a
+                // message, but at least the latter is relevant to requests. Have to filter out
+                // NONs and CONs because they're from the sender's space, and could match randomly.
+                if (msgtype == ACK || msgtype == RST) && details.mid == mid {
+                    return Some(slot);
+                }
+                // We're only falling through here when receiving NON responses, or CON responses.
                 if details.token == token {
+                    // If it's an ACK or RST in here, something went seriously wrong in the peer.
                     return Some(slot);
                 }
             }

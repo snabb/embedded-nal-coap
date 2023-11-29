@@ -22,6 +22,7 @@ pub(crate) enum ParseError {
 
 pub(crate) struct ParsedMessage<'buf> {
     pub msgtype: Type,
+    pub msgid: u16,
     pub token: &'buf [u8],
     pub message: coap_message_utils::inmemory::Message<'buf>,
 }
@@ -70,6 +71,7 @@ pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_
     }
 
     let code = buf[1];
+    let msgid = u16::from_be_bytes(buf[2..4].try_into().unwrap());
 
     if buf.len() < 4 + tkext + tkl {
         // It's slightly weird that after the option of returning an actionalble error we return an
@@ -89,6 +91,7 @@ pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_
 
     Ok(ParsedMessage {
         msgtype,
+        msgid,
         token,
         message: coap_message_utils::inmemory::Message::new(code, tail),
     })
@@ -108,6 +111,7 @@ mod test {
         assert!(matches!(parsed.msgtype, NON));
         assert_eq!(parsed.token, b"");
         assert_eq!(parsed.message.code(), 0);
+        assert_eq!(parsed.msgid, 1);
         assert!(parsed.message.options().next().is_none());
     }
 

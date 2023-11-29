@@ -3,7 +3,7 @@
 pub(crate) const COAP_VERSION: u8 = 1;
 
 #[allow(clippy::upper_case_acronyms)] // because that's how they're written in CoAP
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub(crate) enum Type {
     CON = 0,
     NON = 1,
