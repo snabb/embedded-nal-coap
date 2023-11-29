@@ -96,7 +96,6 @@ const TKL_MAX: usize = 8;
 enum Extracted<R> {
     Silent,
     JustRst,
-    JustAck,
     ProcessResponseThenAck(usize),
     ProcessResponseThenSilent(usize),
     ReactTo {
@@ -653,9 +652,7 @@ where
                 outgoing.done()
             }
             JustRst => OutgoingResponseMessage::empty(buf.as_mut(), RST),
-            JustAck | ProcessResponseThenAck(_) => {
-                OutgoingResponseMessage::empty(buf.as_mut(), ACK)
-            }
+            ProcessResponseThenAck(_) => OutgoingResponseMessage::empty(buf.as_mut(), ACK),
             Silent | ProcessResponseThenSilent(_) => return Ok(()),
         };
 
