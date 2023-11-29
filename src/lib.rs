@@ -360,7 +360,7 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         struct DropGuard<'a, const CONCURRENT_REQUESTS: usize> {
             shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
             slot: usize,
-        };
+        }
         impl<'a, const CONCURRENT_REQUESTS: usize> Drop for DropGuard<'a, CONCURRENT_REQUESTS> {
             fn drop(&mut self) {
                 let mut requests = self.shared.requests.borrow_mut();
