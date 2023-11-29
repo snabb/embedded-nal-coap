@@ -30,6 +30,12 @@ pub(crate) enum ParseError {
     TokenTooLong { msgtype: Type },
 }
 
+pub(crate) struct ParsedMessage<'buf> {
+    pub msgtype: Type,
+    pub token: &'buf [u8],
+    pub message: coap_message_utils::inmemory::Message<'buf>,
+}
+
 /// Parse a received UDP datagram into a CoAP message
 ///
 /// Nothing after the start of the options is processed;
@@ -40,19 +46,7 @@ pub(crate) enum ParseError {
 ///
 /// while conceptually this would need to return the message ID, this is practically not needed
 /// because the main loop leaves message IDs in place.
-// It is only used in one place, and the error type is more geared toward readability than toward
-// efficiency
-#[inline(always)]
-pub(crate) fn parse<const TKL_MAX: usize>(
-    buf: &[u8],
-) -> Result<
-    (
-        Type,
-        heapless::Vec<u8, TKL_MAX>,
-        coap_message_utils::inmemory::Message<'_>,
-    ),
-    ParseError,
-> {
+pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_>, ParseError> {
     use ParseError::*;
 
     if buf.len() < 4 {
@@ -100,15 +94,14 @@ pub(crate) fn parse<const TKL_MAX: usize>(
         // dead is the best we can do anyway).
         return Err(MessageTooShort);
     }
-    let token = heapless::Vec::<_, TKL_MAX>::from_slice(&buf[4 + tkext..][..tkl])
-        .expect("Earlier computation ensured tkl <= TKL_MAX");
+    let token = &buf[4 + tkext..][..tkl];
     let tail = &buf[4 + tkext + tkl..];
 
-    Ok((
+    Ok(ParsedMessage {
         msgtype,
         token,
-        coap_message_utils::inmemory::Message::new(code, tail),
-    ))
+        message: coap_message_utils::inmemory::Message::new(code, tail),
+    })
 }
 
 #[cfg(test)]
@@ -121,11 +114,11 @@ mod test {
     #[test]
     fn test_minimal() {
         let buf = &[0x50, 0, 0, 1];
-        let (t_in, token, msg) = parse::<8>(buf).unwrap();
-        assert!(matches!(t_in, NON));
-        assert_eq!(token, b"");
-        assert_eq!(msg.code(), 0);
-        assert!(msg.options().next().is_none());
+        let parsed = parse::<8>(buf).unwrap();
+        assert!(matches!(parsed.msgtype, NON));
+        assert_eq!(parsed.token, b"");
+        assert_eq!(parsed.message.code(), 0);
+        assert!(parsed.message.options().next().is_none());
     }
 
     #[test]
@@ -154,11 +147,11 @@ mod test {
     #[test]
     fn test_normal_tokens() {
         let buf = &[0x45, 0x44, 1, 2, 0x30, 0x31, 0x32, 0x33, 0x34];
-        let (t_in, token, msg) = parse::<8>(buf).unwrap();
-        assert!(matches!(t_in, CON));
-        assert_eq!(token, b"01234");
-        assert_eq!(msg.code(), 0x44);
-        assert!(msg.options().next().is_none());
+        let parsed = parse::<8>(buf).unwrap();
+        assert!(matches!(parsed.msgtype, CON));
+        assert_eq!(parsed.token, b"01234");
+        assert_eq!(parsed.message.code(), 0x44);
+        assert!(parsed.message.options().next().is_none());
     }
 
     #[test]
@@ -166,28 +159,28 @@ mod test {
         let buf = &[
             0x49, 0x44, 1, 2, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
         ];
-        let (_, token, _) = parse::<32>(buf).unwrap();
-        assert_eq!(token, b"012345678");
+        let parsed = parse::<32>(buf).unwrap();
+        assert_eq!(parsed.token, b"012345678");
 
         let buf = &[
             0x4d, 0x44, 1, 2, 0, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a,
             0x3b, 0x3c,
         ];
-        let (_, token, _) = parse::<32>(buf).unwrap();
-        assert_eq!(token, b"0123456789:;<");
+        let parsed = parse::<32>(buf).unwrap();
+        assert_eq!(parsed.token, b"0123456789:;<");
 
         let buf = &[
             0x4d, 0x44, 1, 2, 1, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a,
             0x3b, 0x3c, 0x3d,
         ];
-        let (_, token, _) = parse::<32>(buf).unwrap();
-        assert_eq!(token, b"0123456789:;<=");
+        let parsed = parse::<32>(buf).unwrap();
+        assert_eq!(parsed.token, b"0123456789:;<=");
 
         let mut buf = [0; 4 + 2 + 269 + 9];
         buf[0] = 0x4e;
         buf[4] = 0;
         buf[5] = 9;
-        let (_, token, _) = parse::<300>(&buf).unwrap();
-        assert_eq!(token, [0; 269 + 9]);
+        let parsed = parse::<300>(&buf).unwrap();
+        assert_eq!(parsed.token, [0; 269 + 9]);
     }
 }

@@ -74,8 +74,8 @@ mod message;
 mod udp_format;
 
 use udp_format::ParseError::*;
-use udp_format::Type;
 use udp_format::Type::*;
+use udp_format::{ParsedMessage, Type};
 
 use coap_message::ReadableMessage;
 use embedded_nal_async::SocketAddr;
@@ -439,11 +439,11 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
 
         // FIXME: There is overhead in running this twice. Should we pass indices? Or just parse
         // result that incorporates an AsRef<[u8]> that is the locked buffer?
-        let Ok((_msgtype, _token, msg)) = udp_format::parse::<TKL_MAX>(&buf[..len]) else {
+        let Ok(ParsedMessage { message, .. }) = udp_format::parse::<TKL_MAX>(&buf[..len]) else {
             unreachable!("Message was parsed once already");
         };
 
-        let response = request.process_response(&msg, carry).await;
+        let response = request.process_response(&message, carry).await;
 
         drop(buf);
 
@@ -488,7 +488,11 @@ where
                         Err(MessageTooShort | WrongVersion) => Silent,
                         Err(TokenTooLong { msgtype: CON }) => JustRst,
                         Err(TokenTooLong { msgtype: _ }) => Silent,
-                        Ok((msgtype, token, message)) => {
+                        Ok(ParsedMessage {
+                            msgtype,
+                            token,
+                            message,
+                        }) => {
                             match coap_numbers::code::classify(message.code()) {
                                 coap_numbers::code::Range::Response(_)
                                 | coap_numbers::code::Range::Empty => {
@@ -510,7 +514,9 @@ where
                                     } else {
                                         ReactTo {
                                             msgtype,
-                                            token,
+                                            token: token
+                                                .try_into()
+                                                .expect("TKL was suitably constrained"),
                                             extracted: self.handler.extract_request_data(&message),
                                         }
                                     };
