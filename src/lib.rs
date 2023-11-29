@@ -439,9 +439,16 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
 
         // FIXME: There is overhead in running this twice. Should we pass indices? Or just parse
         // result that incorporates an AsRef<[u8]> that is the locked buffer?
-        let Ok(ParsedMessage { message, .. }) = udp_read::parse::<TKL_MAX>(&buf[..len]) else {
+        let Ok(ParsedMessage {
+            message, msgtype, ..
+        }) = udp_read::parse::<TKL_MAX>(&buf[..len])
+        else {
             unreachable!("Message was parsed once already");
         };
+
+        if msgtype == RST {
+            return Err(TransportError::GotRst);
+        }
 
         let response = request.process_response(&message, carry).await;
 
