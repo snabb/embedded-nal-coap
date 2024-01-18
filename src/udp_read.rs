@@ -24,13 +24,13 @@ pub(crate) struct ParsedMessage<'buf> {
     pub msgtype: Type,
     pub msgid: u16,
     pub token: &'buf [u8],
-    pub message: coap_message_utils::inmemory::Message<'buf>,
+    pub message: coap_message_implementations::inmemory::Message<'buf>,
 }
 
 /// Parse a received UDP datagram into a CoAP message
 ///
 /// Nothing after the start of the options is processed;
-/// [coap_message_utils::inmemory::OPTION_INVALID] has details on why that works.
+/// [coap_message_implementations::inmemory::OPTION_INVALID] has details on why that works.
 ///
 /// Note that TKL_MAX needs to be at least 8, and that is also a good default value. Larger values
 /// only make sense in the context of RFC8974, in which case 32 is a good value.
@@ -93,7 +93,7 @@ pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_
         msgtype,
         msgid,
         token,
-        message: coap_message_utils::inmemory::Message::new(code, tail),
+        message: coap_message_implementations::inmemory::Message::new(code, tail),
     })
 }
 

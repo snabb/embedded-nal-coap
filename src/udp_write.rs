@@ -12,7 +12,7 @@ use crate::udp_format::{Type, COAP_VERSION};
 
 pub(crate) struct OutgoingResponseMessage<'buf> {
     tkl_including_extra: usize,
-    message: coap_message_utils::inmemory_write::Message<'buf>,
+    message: coap_message_implementations::inmemory_write::Message<'buf>,
 }
 
 impl<'buf> OutgoingResponseMessage<'buf> {
@@ -35,7 +35,7 @@ impl<'buf> OutgoingResponseMessage<'buf> {
         let (header, tokentail) = buf.split_at_mut(4);
         Self {
             tkl_including_extra,
-            message: coap_message_utils::inmemory_write::Message::new(
+            message: coap_message_implementations::inmemory_write::Message::new(
                 &mut header[1],
                 &mut tokentail[tkl_including_extra..],
             ),
@@ -48,7 +48,9 @@ impl<'buf> OutgoingResponseMessage<'buf> {
         4
     }
 
-    pub(crate) fn message(&mut self) -> &mut coap_message_utils::inmemory_write::Message<'buf> {
+    pub(crate) fn message(
+        &mut self,
+    ) -> &mut coap_message_implementations::inmemory_write::Message<'buf> {
         &mut self.message
     }
 
@@ -67,7 +69,7 @@ pub(crate) struct MessageWritten(usize);
 
 /// Helper for writing outgoing requests (used in the user task)
 pub(crate) struct OutgoingRequestMessage<'buf>(
-    pub(crate) coap_message_utils::inmemory_write::Message<'buf>,
+    pub(crate) coap_message_implementations::inmemory_write::Message<'buf>,
 );
 
 impl<'buf> OutgoingRequestMessage<'buf> {
@@ -79,12 +81,14 @@ impl<'buf> OutgoingRequestMessage<'buf> {
     pub(crate) fn new(buf: &'buf mut [u8]) -> Self {
         // Token length is 2
         let (header, tail) = buf.split_at_mut(6);
-        OutgoingRequestMessage(coap_message_utils::inmemory_write::Message::new(
+        OutgoingRequestMessage(coap_message_implementations::inmemory_write::Message::new(
             &mut header[1],
             tail,
         ))
     }
-    pub(crate) fn message(&mut self) -> &mut coap_message_utils::inmemory_write::Message<'buf> {
+    pub(crate) fn message(
+        &mut self,
+    ) -> &mut coap_message_implementations::inmemory_write::Message<'buf> {
         &mut self.0
     }
     pub(crate) fn done(self) -> MessageWritten {

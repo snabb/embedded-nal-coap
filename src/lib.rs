@@ -338,6 +338,11 @@ pub struct RequestingCoAPClient<'a, const CONCURRENT_REQUESTS: usize> {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum TransportError {
+    /// Writing to the request buffer failed
+    ///
+    /// This can be justified a transport error -- for example, writing too large a payload just
+    /// doesn't work over UDP (but may work over TCP).
+    CouldNotWrite(coap_message_implementations::inmemory_write::WriteError),
     /// An RST was sent in response to the request message
     GotRst,
 }
@@ -345,8 +350,9 @@ pub enum TransportError {
 impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
     for RequestingCoAPClient<'a, CONCURRENT_REQUESTS>
 {
-    type RequestMessage<'b> = coap_message_utils::inmemory_write::Message<'b> where Self: 'b;
-    type ResponseMessage<'b> = coap_message_utils::inmemory::Message<'b> where Self: 'b;
+    type RequestUnionError = coap_message_implementations::inmemory_write::WriteError;
+    type RequestMessage<'b> = coap_message_implementations::inmemory_write::Message<'b> where Self: 'b;
+    type ResponseMessage<'b> = coap_message_implementations::inmemory::Message<'b> where Self: 'b;
     type TransportError = TransportError;
 
     async fn request<Req: coap_request::Request<Self>>(
@@ -412,7 +418,10 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
         drop(requests);
 
         let mut outgoing = OutgoingRequestMessage::new(buf.as_mut());
-        let carry = request.build_request(outgoing.message()).await;
+        let carry = request
+            .build_request(outgoing.message())
+            .await
+            .map_err(TransportError::CouldNotWrite)?;
         let written = outgoing.done();
 
         let mut requests = self.shared.requests.borrow_mut();
@@ -648,7 +657,35 @@ where
 
                 // FIXME amplification mitigation
 
-                self.handler.build_response(outgoing.message(), extracted);
+                use coap_message::error::RenderableOnMinimal;
+                use coap_message::MinimalWritableMessage;
+                let outmsg = outgoing.message();
+                match extracted {
+                    Ok(extracted) => {
+                        let rendered = self.handler.build_response(outmsg, extracted);
+                        if let Err(e) = rendered {
+                            // Response building errors get two chances to render
+                            outmsg.reset();
+                            if let Err(e2) = e.render(outmsg) {
+                                outmsg.reset();
+                                if let Err(_) = e2.render(outmsg) {
+                                    outmsg.reset();
+                                    outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // Extraction time errors get two chances to render
+                        if let Err(e2) = e.render(outmsg) {
+                            outmsg.reset();
+                            if let Err(_) = e2.render(outmsg) {
+                                outmsg.reset();
+                                outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
+                            }
+                        }
+                    }
+                }
                 outgoing.done()
             }
             JustRst => OutgoingResponseMessage::empty(buf.as_mut(), RST),
