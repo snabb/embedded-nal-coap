@@ -18,7 +18,7 @@ maintenance = { status = "experimental" }
 coap-message = "^0.3.0"
 coap-handler = "^0.2.0"
 coap-request = "^0.2.0-alpha.2"
-embedded-nal-async = "0.6"
+embedded-nal-async = "0.7"
 rand_core = { version = "0.6", default-features = false }
 
 # internally used
