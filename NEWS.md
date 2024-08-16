@@ -1,4 +1,8 @@
-# Changes in 0.1.0-alpha.1
+# Changes in 0.1.0-alpha.3
+
+* Add defmt feature, derive defmt::Format on errors.
+
+# Changes in 0.1.0-alpha.2
 
 *This is a breaking change*
 
