@@ -336,6 +336,7 @@ pub struct RequestingCoAPClient<'a, const CONCURRENT_REQUESTS: usize> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum TransportError {
     /// Writing to the request buffer failed
