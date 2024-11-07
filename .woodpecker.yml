@@ -4,6 +4,7 @@ steps:
     commands:
     - cargo version && cargo build --all
     when:
+      event: [pull_request]
       path:
       - "src/*"
       - .woodpecker.yml
@@ -14,6 +15,7 @@ steps:
     - rustup component add rustfmt
     - cargo fmt --check
     when:
+      event: [pull_request]
       path:
       - "src/*"
       - .woodpecker.yml
@@ -24,6 +26,7 @@ steps:
     - RUSTFLAGS="-D warnings" cargo check 
     - cargo clippy -- --deny clippy::all
     when:
+      event: [pull_request]
       path:
       - "src/*"
       - .woodpecker.yml
@@ -35,6 +38,7 @@ steps:
     - cargo install cargo-readme
     - cargo readme | diff /dev/stdin README.md
     when:
+      event: [pull_request]
       path:
         - README.md
         - src/lib.rs
