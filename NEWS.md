@@ -1,3 +1,10 @@
+# Changes in 0.1.0-alpha.4
+
+*This is a breaking change*
+
+* Update embedded_nal_async from 0.7 to 0.8.
+* CI fixes.
+
 # Changes in 0.1.0-alpha.3
 
 * Add defmt feature, derive defmt::Format on errors.
