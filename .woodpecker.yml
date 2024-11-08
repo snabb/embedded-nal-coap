@@ -1,34 +1,45 @@
 steps:
   build:
-    # switch to docker.io/rust:latest once 1.75 is out (and consider adding an MSRV check)
-    image: docker.io/rustlang/rust:nightly
+    image: docker.io/rust:1.79
     commands:
     - cargo version && cargo build --all
     when:
-      path: "src/*"
+      event: [pull_request]
+      path:
+      - "src/*"
+      - .woodpecker.yml
 
   fmt:
-    image: docker.io/rustlang/rust:nightly
+    image: docker.io/rust
     commands:
+    - rustup component add rustfmt
     - cargo fmt --check
     when:
-      path: "src/*"
+      event: [pull_request]
+      path:
+      - "src/*"
+      - .woodpecker.yml
 
   lint:
-    image: docker.io/rustlang/rust:nightly
+    image: docker.io/rust
     commands:
     - RUSTFLAGS="-D warnings" cargo check 
     - cargo clippy -- --deny clippy::all
     when:
-      path: "src/*"
+      event: [pull_request]
+      path:
+      - "src/*"
+      - .woodpecker.yml
     failure: ignore
 
   readme:
-    image: docker.io/rustlang/rust:nightly
+    image: docker.io/rust
     commands:
     - cargo install cargo-readme
     - cargo readme | diff /dev/stdin README.md
     when:
+      event: [pull_request]
       path:
         - README.md
         - src/lib.rs
+        - .woodpecker.yml
