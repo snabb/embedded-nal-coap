@@ -74,12 +74,13 @@ mod udp_format;
 mod udp_read;
 mod udp_write;
 
+use core::net::{IpAddr, Ipv6Addr, SocketAddr};
+
 use udp_format::Type::{self, *};
 use udp_read::{ParseError::*, ParsedMessage};
 use udp_write::{finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage};
 
 use coap_message::ReadableMessage;
-use embedded_nal_async::SocketAddr;
 
 /// Maximum size of a CoAP message we need to expect
 ///
@@ -525,10 +526,7 @@ where
         let len = finish_outgoing(buf.as_mut(), true, details.mid, details.token, *written);
 
         // FIXME can this be any-protocol?
-        const SOCK_UNSPEC: SocketAddr = SocketAddr::new(
-            embedded_nal_async::IpAddr::V6(embedded_nal_async::Ipv6Addr::UNSPECIFIED),
-            0,
-        );
+        const SOCK_UNSPEC: SocketAddr = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0);
         // FIXME: Should we allow the requester to do follow-ups from the same address, or
         // will they just not see the change and suffer breakage mid-blockwise?
         let local = SOCK_UNSPEC;
