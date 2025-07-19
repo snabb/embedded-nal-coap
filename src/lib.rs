@@ -263,7 +263,7 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
             buffer: [0; MAX_SIZE].into(),
             requests: [Empty; CONCURRENT_REQUESTS].into(),
             app_to_loop: Default::default(),
-            loop_to_app: [EMPTY_SIGNAL; CONCURRENT_REQUESTS].into(),
+            loop_to_app: [EMPTY_SIGNAL; CONCURRENT_REQUESTS],
             request_became_empty: Default::default(),
         }
     }
@@ -613,7 +613,7 @@ where
                         // even bother the message handler. (Well at least it should cancel
                         // retransmissions, so it probably *should* go in there).
 
-                        match (msgtype, self.match_to_slot(msgtype, msgid, &token)) {
+                        match (msgtype, self.match_to_slot(msgtype, msgid, token)) {
                             (CON, Some(slot)) => ProcessResponseThenAck(slot),
                             (CON, None) => JustRst,
                             (_, Some(slot)) => ProcessResponseThenSilent(slot),
