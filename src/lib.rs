@@ -353,8 +353,14 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
     for RequestingCoAPClient<'a, CONCURRENT_REQUESTS>
 {
     type RequestUnionError = coap_message_implementations::inmemory_write::WriteError;
-    type RequestMessage<'b> = coap_message_implementations::inmemory_write::Message<'b> where Self: 'b;
-    type ResponseMessage<'b> = coap_message_implementations::inmemory::Message<'b> where Self: 'b;
+    type RequestMessage<'b>
+        = coap_message_implementations::inmemory_write::Message<'b>
+    where
+        Self: 'b;
+    type ResponseMessage<'b>
+        = coap_message_implementations::inmemory::Message<'b>
+    where
+        Self: 'b;
     type TransportError = TransportError;
 
     async fn request<Req: coap_request::Request<Self>>(
