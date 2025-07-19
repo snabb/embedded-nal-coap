@@ -150,6 +150,10 @@ enum RequestState {
     /// signal through `.app_to_loop`.
     // len? Or indices? (see also `.request()` comments)
     ResponsePending {
+        #[expect(
+            dead_code,
+            reason = "Will be needed once multicast responses indicate their remote address"
+        )]
         details: RequestMatchingDetails,
         len: usize,
     },
@@ -232,6 +236,10 @@ where
     socket: &'a mut Socket,
     handler: &'a mut Handler,
 
+    #[expect(
+        dead_code,
+        reason = "Currently unused, but will be needed for retransmissions and token generation"
+    )]
     rand: &'a mut RandomSource,
 
     // FIXME: There is time stuff involved actually -- not sending 64k messages within short times,
