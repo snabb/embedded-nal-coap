@@ -150,6 +150,10 @@ enum RequestState {
     /// signal through `.app_to_loop`.
     // len? Or indices? (see also `.request()` comments)
     ResponsePending {
+        #[expect(
+            dead_code,
+            reason = "Will be needed once multicast responses indicate their remote address"
+        )]
         details: RequestMatchingDetails,
         len: usize,
     },
@@ -232,6 +236,10 @@ where
     socket: &'a mut Socket,
     handler: &'a mut Handler,
 
+    #[expect(
+        dead_code,
+        reason = "Currently unused, but will be needed for retransmissions and token generation"
+    )]
     rand: &'a mut RandomSource,
 
     // FIXME: There is time stuff involved actually -- not sending 64k messages within short times,
@@ -255,7 +263,7 @@ impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
             buffer: [0; MAX_SIZE].into(),
             requests: [Empty; CONCURRENT_REQUESTS].into(),
             app_to_loop: Default::default(),
-            loop_to_app: [EMPTY_SIGNAL; CONCURRENT_REQUESTS].into(),
+            loop_to_app: [EMPTY_SIGNAL; CONCURRENT_REQUESTS],
             request_became_empty: Default::default(),
         }
     }
@@ -353,8 +361,14 @@ impl<'a, const CONCURRENT_REQUESTS: usize> coap_request::Stack
     for RequestingCoAPClient<'a, CONCURRENT_REQUESTS>
 {
     type RequestUnionError = coap_message_implementations::inmemory_write::WriteError;
-    type RequestMessage<'b> = coap_message_implementations::inmemory_write::Message<'b> where Self: 'b;
-    type ResponseMessage<'b> = coap_message_implementations::inmemory::Message<'b> where Self: 'b;
+    type RequestMessage<'b>
+        = coap_message_implementations::inmemory_write::Message<'b>
+    where
+        Self: 'b;
+    type ResponseMessage<'b>
+        = coap_message_implementations::inmemory::Message<'b>
+    where
+        Self: 'b;
     type TransportError = TransportError;
 
     async fn request<Req: coap_request::Request<Self>>(
@@ -599,7 +613,7 @@ where
                         // even bother the message handler. (Well at least it should cancel
                         // retransmissions, so it probably *should* go in there).
 
-                        match (msgtype, self.match_to_slot(msgtype, msgid, &token)) {
+                        match (msgtype, self.match_to_slot(msgtype, msgid, token)) {
                             (CON, Some(slot)) => ProcessResponseThenAck(slot),
                             (CON, None) => JustRst,
                             (_, Some(slot)) => ProcessResponseThenSilent(slot),

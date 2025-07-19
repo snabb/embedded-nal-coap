@@ -128,7 +128,7 @@ mod test {
     use super::*;
 
     const GET_HELLO: [u8; 12] = [
-        0x52, 1, 0x12, 0x34, 0x56, 0x78, 0xb5, 'h' as _, 'e' as _, 'l' as _, 'l' as _, 'o' as _,
+        0x52, 1, 0x12, 0x34, 0x56, 0x78, 0xb5, b'h', b'e', b'l', b'l', b'o',
     ];
 
     #[test]
@@ -157,10 +157,7 @@ mod test {
         let written = out.done();
         assert_eq!(
             &buf[..written],
-            &[
-                0x62, 0x45, 0x12, 0x34, 0x56, 0x78, 0xff, 'W' as _, 'o' as _, 'r' as _, 'l' as _,
-                'd' as _
-            ]
+            &[0x62, 0x45, 0x12, 0x34, 0x56, 0x78, 0xff, b'W', b'o', b'r', b'l', b'd']
         );
     }
 
@@ -183,7 +180,7 @@ mod test {
         manual_comparison_buf[0] = 0x6d;
         manual_comparison_buf[1] = 0x45;
         manual_comparison_buf[18] = 0xff;
-        manual_comparison_buf[19] = 'x' as _;
+        manual_comparison_buf[19] = b'x';
         assert_eq!(&buf[..written], &manual_comparison_buf);
     }
 }
