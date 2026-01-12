@@ -15,14 +15,14 @@ An example of how to use this will be available as part of the [coap-message-dem
   be used to send CoAP requests and receive a response. (Multiple responses, eg. from
   observation, are planned but not implemented yet).
   
-  The [coap_request_implementations][__link6] crate contains suitable (albeit immature) building blocks
+  The [coap-request-implementations][__link6] crate contains suitable (albeit immature) building blocks
   for constructing requests.
 
 * Into the server’s [CoAPRunner::run()][__link7] method, pass an unconnected [UDP
   socket][__link8], a source of low-grade entropy (for
   retransmission jitter and that like) and a [CoAP server application][__link9].
   
-  The [coap_handler_implementations][__link10] crate contains suitable building blocks for constructing
+  The [coap-handler-implementations][__link10] crate contains suitable building blocks for constructing
   such a server application (including some to combine handlers for individual resources into a
   handler that picks sub-handlers from the URI path).
   
@@ -51,10 +51,10 @@ An example of how to use this will be available as part of the [coap-message-dem
 * The server does not perform any message deduplication. All handler functions must therefore
   be idempotent.
 
-* Messages are created with as little copying as [embedded_nal][__link11] permits. For writable messages,
+* Messages are created with as little copying as [`embedded_nal_async`][__link11] permits. For writable messages,
   that means that they need to be written to in ascending CoAP option number. This is in
-  accordance with the implemented [coap_message::MinimalWritableMessage][__link12] and
-  [coap_message::MutableWritableMessage][__link13] traits.
+  accordance with the implemented [`coap_message::MinimalWritableMessage`][__link12] and
+  [`coap_message::MutableWritableMessage`][__link13] traits.
   
   That restriction enables this crate to not only be `no_std`, but to not require `alloc`
   either.
@@ -68,18 +68,18 @@ out that a more effective implementation uses different tasks for send and recei
 single buffer or an at-least-1-sized pool that gets locked by the tasks).
 
 
- [__cargo_doc2readme_dependencies_info]: ggGkYW0CYXSEG_W_Gn_kaocAGwCcVPfenh7eGy6gYLEwyIe4G6-xw_FwcbpjYXKEG9qkcS7E2bujG4E2mUZreL7QGwZALYzR9z2YG_dK1lOB3yUHYWSIgmxjb2FwX2hhbmRsZXJlMC4yLjGCeBxjb2FwX2hhbmRsZXJfaW1wbGVtZW50YXRpb25z9oJsY29hcF9tZXNzYWdlZTAuMy42gmxjb2FwX3JlcXVlc3RtMC4yLjAtYWxwaGEuMoJ4HGNvYXBfcmVxdWVzdF9pbXBsZW1lbnRhdGlvbnP2g3FlbWJlZGRlZC1uYWwtY29hcG0wLjEuMC1hbHBoYS41cWVtYmVkZGVkX25hbF9jb2FwgmxlbWJlZGRlZF9uYWz2gnJlbWJlZGRlZF9uYWxfYXN5bmNlMC45LjA
+ [__cargo_doc2readme_dependencies_info]: ggGkYW0CYXSEG_W_Gn_kaocAGwCcVPfenh7eGy6gYLEwyIe4G6-xw_FwcbpjYXKEG2R7VyeTF1PlGwQQXbRi58ywG32uc44H21YZG63EgUDCVUYqYWSFgmxjb2FwX2hhbmRsZXJlMC4yLjGCbGNvYXBfbWVzc2FnZWUwLjMuNoJsY29hcF9yZXF1ZXN0bTAuMi4wLWFscGhhLjKDcWVtYmVkZGVkLW5hbC1jb2FwbTAuMS4wLWFscGhhLjVxZW1iZWRkZWRfbmFsX2NvYXCCcmVtYmVkZGVkX25hbF9hc3luY2UwLjkuMA
  [__link0]: https://crates.io/crates/embedded_nal_async/0.9.0
- [__link1]: coap-message-demos
- [__link10]: https://crates.io/crates/coap_handler_implementations
- [__link11]: https://crates.io/crates/embedded_nal
+ [__link1]: https://crates.io/crates/coap-message-demos
+ [__link10]: https://crates.io/crates/coap-handler-implementations
+ [__link11]: https://crates.io/crates/embedded_nal_async/0.9.0
  [__link12]: https://docs.rs/coap_message/0.3.6/coap_message/?search=MinimalWritableMessage
  [__link13]: https://docs.rs/coap_message/0.3.6/coap_message/?search=MutableWritableMessage
  [__link2]: https://docs.rs/embedded-nal-coap/0.1.0-alpha.5/embedded_nal_coap/struct.CoAPShared.html
  [__link3]: CoAPShared::split()
  [__link4]: CoAPRuntimeClient::to()
  [__link5]: https://docs.rs/coap_request/0.2.0-alpha.2/coap_request/?search=Stack
- [__link6]: https://crates.io/crates/coap_request_implementations
+ [__link6]: https://crates.io/crates/coap-request-implementations
  [__link7]: CoAPRunner::run()
  [__link8]: https://docs.rs/embedded_nal_async/0.9.0/embedded_nal_async/?search=UnconnectedUdp
  [__link9]: https://docs.rs/coap_handler/0.2.1/coap_handler/?search=Handler
