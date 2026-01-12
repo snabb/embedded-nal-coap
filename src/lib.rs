@@ -5,6 +5,8 @@
 //!
 //! An example of how to use this will be available as part of the [coap-message-demos] crate.
 //!
+//! [coap-message-demos]: https://crates.io/crates/coap-message-demos
+//!
 //! * Allocate a [CoAPShared] with a `CONCURRENT_REQUESTS` const of the number of outgoing requests
 //!   that should be servicable simultaneously.
 //!
@@ -14,19 +16,23 @@
 //!   be used to send CoAP requests and receive a response. (Multiple responses, eg. from
 //!   observation, are planned but not implemented yet).
 //!
-//!   The [coap_request_implementations] crate contains suitable (albeit immature) building blocks
+//!   The [coap-request-implementations] crate contains suitable (albeit immature) building blocks
 //!   for constructing requests.
+//!
+//!   [coap-request-implementations]: https://crates.io/crates/coap-request-implementations
 //!
 //! * Into the server's [CoAPRunner::run()] method, pass an unconnected [UDP
 //!   socket](embedded_nal_async::UnconnectedUdp), a source of low-grade entropy (for
 //!   retransmission jitter and that like) and a [CoAP server application](coap_handler::Handler).
 //!
-//!   The [coap_handler_implementations] crate contains suitable building blocks for constructing
+//!   The [coap-handler-implementations] crate contains suitable building blocks for constructing
 //!   such a server application (including some to combine handlers for individual resources into a
 //!   handler that picks sub-handlers from the URI path).
 //!
 //!   The future returned by the run function needs to be polled by an executor; note that it is
 //!   not Send, and some executors need configuration to allow that.
+//!
+//!   [coap-handler-implementations]: https://crates.io/crates/coap-handler-implementations
 //!
 //!
 //! Caveats
@@ -52,10 +58,10 @@
 //! * The server does not perform any message deduplication. All handler functions must therefore
 //!   be idempotent.
 //!
-//! * Messages are created with as little copying as [embedded_nal] permits. For writable messages,
+//! * Messages are created with as little copying as [`embedded_nal_async`] permits. For writable messages,
 //!   that means that they need to be written to in ascending CoAP option number. This is in
-//!   accordance with the implemented [coap_message::MinimalWritableMessage] and
-//!   [coap_message::MutableWritableMessage] traits.
+//!   accordance with the implemented [`coap_message::MinimalWritableMessage`] and
+//!   [`coap_message::MutableWritableMessage`] traits.
 //!
 //!   That restriction enables this crate to not only be `no_std`, but to not require `alloc`
 //!   either.
@@ -168,7 +174,8 @@ use RequestState::*;
 /// The shared state of a CoAP main loop, which would typically run as a server and client
 /// simultaneously.
 ///
-/// This is usually created once and then [`.split()`] up into a client and a server part.
+/// This is usually created once and then [`.split()`][Self::split()] up into a client and a server
+/// part.
 ///
 /// Relevant generics:
 /// * `CONCURRENT_REQUESTS` indicates how many requests may be outstanding simultaneously on the
@@ -204,13 +211,13 @@ pub struct CoAPShared<const CONCURRENT_REQUESTS: usize> {
 
 /// Access to the client side of a [CoAPShared]
 ///
-/// From this, requests can be be started through the [`.to()`] method.
+/// From this, requests can be be started through the [`.to()`][Self::to()] method.
 ///
 /// This is the "runtime" variant because it can be copied around arbitrarily, and requests made
 /// through it take any available of the `CONCURRENT_REQUESTS` slots.
 ///
 /// Note that requests sent through this only make progress while the socket part of it is
-/// `[.run()]` (and being awaited).
+/// [`.run()`][CoAPRunner::run()] (and being awaited).
 #[derive(Copy, Clone)]
 pub struct CoAPRuntimeClient<'a, const CONCURRENT_REQUESTS: usize> {
     shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
@@ -218,13 +225,13 @@ pub struct CoAPRuntimeClient<'a, const CONCURRENT_REQUESTS: usize> {
 
 /// Access to the server side of a [CoAPShared]
 ///
-/// This needs to be [`.run()`] both in order to serve peers and to make progress on any
+/// This needs to be [`.run()`][Self::run] both in order to serve peers and to make progress on any
 /// requests issued through the CoAPRuntimeClient on the same Shared.
 pub struct CoAPRunner<'a, const CONCURRENT_REQUESTS: usize> {
     shared: &'a CoAPShared<CONCURRENT_REQUESTS>,
 }
 
-/// Parts of the `.run()` loop that are exclusively held
+/// Parts of the [`.run()`][Self::run] loop that are exclusively held
 /// Relevant generics:
 /// * `Socket` indicates which kind of UDP socket this will run on
 /// * `Handler` is the CoAP request handler type -- the application's implementation of a CoAP
