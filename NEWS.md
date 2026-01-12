@@ -1,3 +1,10 @@
+# Changes in 0.1.0-alpha.5
+
+* Breaking: Updated rand_core dependency from 0.6 to 0.9.
+* Updated internal embassy-sync and heapless dependencies.
+* Updated edition to 2024.
+* Linter and CI fixes.
+
 # Changes in 0.1.0-alpha.4
 
 *This is a breaking change*
