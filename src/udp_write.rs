@@ -8,7 +8,7 @@
 //!   used when writing requests. They can apply the simplification that they don't need to work
 //!   for arbitrary token sizes.
 
-use crate::udp_format::{Type, COAP_VERSION};
+use crate::udp_format::{COAP_VERSION, Type};
 
 pub(crate) struct OutgoingResponseMessage<'buf> {
     tkl_including_extra: usize,
@@ -157,7 +157,9 @@ mod test {
         let written = out.done();
         assert_eq!(
             &buf[..written],
-            &[0x62, 0x45, 0x12, 0x34, 0x56, 0x78, 0xff, b'W', b'o', b'r', b'l', b'd']
+            &[
+                0x62, 0x45, 0x12, 0x34, 0x56, 0x78, 0xff, b'W', b'o', b'r', b'l', b'd'
+            ]
         );
     }
 

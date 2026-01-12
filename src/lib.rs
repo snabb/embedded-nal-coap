@@ -82,7 +82,7 @@ use core::net::{IpAddr, Ipv6Addr, SocketAddr};
 
 use udp_format::Type::{self, *};
 use udp_read::{ParseError::*, ParsedMessage};
-use udp_write::{finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage};
+use udp_write::{MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage, finish_outgoing};
 
 use coap_message::ReadableMessage;
 
@@ -683,8 +683,8 @@ where
 
                 // FIXME amplification mitigation
 
-                use coap_message::error::RenderableOnMinimal;
                 use coap_message::MinimalWritableMessage;
+                use coap_message::error::RenderableOnMinimal;
                 let outmsg = outgoing.message();
                 match extracted {
                     Ok(extracted) => {
