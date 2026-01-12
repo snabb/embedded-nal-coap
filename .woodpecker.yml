@@ -6,6 +6,7 @@ steps:
     when:
       event: [pull_request]
       path:
+      - Cargo.toml
       - "src/*"
       - .woodpecker.yml
 
