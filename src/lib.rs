@@ -69,6 +69,10 @@
 //! out that a more effective implementation uses different tasks for send and receive, but uses a
 //! single buffer or an at-least-1-sized pool that gets locked by the tasks).
 #![no_std]
+#![allow(
+    clippy::await_holding_refcell_ref,
+    reason = "Workaround for <https://github.com/rust-lang/rust-clippy/issues/6353>"
+)]
 
 mod udp_format;
 mod udp_read;
@@ -261,6 +265,10 @@ impl<const CONCURRENT_REQUESTS: usize> Default for CoAPShared<CONCURRENT_REQUEST
 impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
     pub fn new() -> Self {
         // weird array initialization but OK
+        #[allow(
+            clippy::declare_interior_mutable_const,
+            reason = "Workaround for <https://github.com/rust-lang/rust-clippy/issues/7665>"
+        )]
         const EMPTY_SIGNAL: embassy_sync::signal::Signal<
             embassy_sync::blocking_mutex::raw::NoopRawMutex,
             (),
@@ -686,7 +694,7 @@ where
                             outmsg.reset();
                             if let Err(e2) = e.render(outmsg) {
                                 outmsg.reset();
-                                if let Err(_) = e2.render(outmsg) {
+                                if e2.render(outmsg).is_err() {
                                     outmsg.reset();
                                     outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
                                 }
@@ -697,7 +705,7 @@ where
                         // Extraction time errors get two chances to render
                         if let Err(e2) = e.render(outmsg) {
                             outmsg.reset();
-                            if let Err(_) = e2.render(outmsg) {
+                            if e2.render(outmsg).is_err() {
                                 outmsg.reset();
                                 outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
                             }
