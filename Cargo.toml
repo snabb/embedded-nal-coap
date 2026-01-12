@@ -2,7 +2,7 @@
 name = "embedded-nal-coap"
 version = "0.1.0-alpha.4"
 authors = ["chrysn <chrysn@fsfe.org>"]
-edition = "2021"
+edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://codeberg.org/chrysn/embedded-nal-coap"
 keywords = ["network", "coap"]

@@ -1,6 +1,6 @@
 //! Tools for reading CoAP-over-UDP messages from a buffer
 
-use crate::udp_format::{Type, COAP_VERSION};
+use crate::udp_format::{COAP_VERSION, Type};
 
 #[derive(Debug)]
 pub(crate) enum ParseError {
@@ -101,8 +101,8 @@ pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_
 mod test {
     use super::*;
     use crate::udp_format::Type::*;
-    use coap_message::ReadableMessage;
     use ParseError::*;
+    use coap_message::ReadableMessage;
 
     #[test]
     fn test_minimal() {

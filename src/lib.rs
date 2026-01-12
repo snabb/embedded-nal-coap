@@ -69,6 +69,10 @@
 //! out that a more effective implementation uses different tasks for send and receive, but uses a
 //! single buffer or an at-least-1-sized pool that gets locked by the tasks).
 #![no_std]
+#![allow(
+    clippy::await_holding_refcell_ref,
+    reason = "Workaround for <https://github.com/rust-lang/rust-clippy/issues/6353>"
+)]
 
 mod udp_format;
 mod udp_read;
@@ -78,7 +82,7 @@ use core::net::{IpAddr, Ipv6Addr, SocketAddr};
 
 use udp_format::Type::{self, *};
 use udp_read::{ParseError::*, ParsedMessage};
-use udp_write::{finish_outgoing, MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage};
+use udp_write::{MessageWritten, OutgoingRequestMessage, OutgoingResponseMessage, finish_outgoing};
 
 use coap_message::ReadableMessage;
 
@@ -252,9 +256,19 @@ where
     next_token: u16,
 }
 
+impl<const CONCURRENT_REQUESTS: usize> Default for CoAPShared<CONCURRENT_REQUESTS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
     pub fn new() -> Self {
         // weird array initialization but OK
+        #[allow(
+            clippy::declare_interior_mutable_const,
+            reason = "Workaround for <https://github.com/rust-lang/rust-clippy/issues/7665>"
+        )]
         const EMPTY_SIGNAL: embassy_sync::signal::Signal<
             embassy_sync::blocking_mutex::raw::NoopRawMutex,
             (),
@@ -621,7 +635,7 @@ where
                         }
                     }
                     coap_numbers::code::Range::Request => {
-                        let action = if msgtype == ACK || msgtype == RST {
+                        if msgtype == ACK || msgtype == RST {
                             // These should never be responses; ignoring them as protocol errors.
                             Silent
                         } else {
@@ -630,8 +644,7 @@ where
                                 token: token.try_into().expect("TKL was suitably constrained"),
                                 extracted: self.handler.extract_request_data(&message),
                             }
-                        };
-                        action
+                        }
                     }
                     _ => Silent,
                 }
@@ -670,8 +683,8 @@ where
 
                 // FIXME amplification mitigation
 
-                use coap_message::error::RenderableOnMinimal;
                 use coap_message::MinimalWritableMessage;
+                use coap_message::error::RenderableOnMinimal;
                 let outmsg = outgoing.message();
                 match extracted {
                     Ok(extracted) => {
@@ -681,7 +694,7 @@ where
                             outmsg.reset();
                             if let Err(e2) = e.render(outmsg) {
                                 outmsg.reset();
-                                if let Err(_) = e2.render(outmsg) {
+                                if e2.render(outmsg).is_err() {
                                     outmsg.reset();
                                     outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
                                 }
@@ -692,7 +705,7 @@ where
                         // Extraction time errors get two chances to render
                         if let Err(e2) = e.render(outmsg) {
                             outmsg.reset();
-                            if let Err(_) = e2.render(outmsg) {
+                            if e2.render(outmsg).is_err() {
                                 outmsg.reset();
                                 outmsg.set_code(coap_numbers::code::INTERNAL_SERVER_ERROR);
                             }
