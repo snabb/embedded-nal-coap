@@ -252,6 +252,12 @@ where
     next_token: u16,
 }
 
+impl<const CONCURRENT_REQUESTS: usize> Default for CoAPShared<CONCURRENT_REQUESTS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const CONCURRENT_REQUESTS: usize> CoAPShared<CONCURRENT_REQUESTS> {
     pub fn new() -> Self {
         // weird array initialization but OK
@@ -621,7 +627,7 @@ where
                         }
                     }
                     coap_numbers::code::Range::Request => {
-                        let action = if msgtype == ACK || msgtype == RST {
+                        if msgtype == ACK || msgtype == RST {
                             // These should never be responses; ignoring them as protocol errors.
                             Silent
                         } else {
@@ -630,8 +636,7 @@ where
                                 token: token.try_into().expect("TKL was suitably constrained"),
                                 extracted: self.handler.extract_request_data(&message),
                             }
-                        };
-                        action
+                        }
                     }
                     _ => Silent,
                 }
