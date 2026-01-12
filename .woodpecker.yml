@@ -36,10 +36,9 @@ steps:
     failure: ignore
 
   readme:
-    image: docker.io/rust
+    image: codeberg.org/msrd0/cargo-doc2readme
     commands:
-    - cargo install cargo-readme
-    - cargo readme | diff /dev/stdin README.md
+    - cargo doc2readme --check
     when:
       event: [pull_request]
       path:
