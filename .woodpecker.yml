@@ -1,6 +1,6 @@
 steps:
   build:
-    image: docker.io/rust:1.79
+    image: docker.io/rust:1.88
     commands:
     - cargo version && cargo build --all
     when:
