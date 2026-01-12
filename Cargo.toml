@@ -29,7 +29,7 @@ coap-message-implementations = "0.1.4"
 # It seems this is the easiest no_std "wait for either" tool around
 embassy-futures = "0.1"
 # ... and an easy settable flag
-embassy-sync = "0.3"
+embassy-sync = "0.7.2"
 
 # to provide Format on errors
 defmt = { version = "0.3.8", optional = true }
