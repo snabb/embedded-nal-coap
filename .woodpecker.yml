@@ -1,7 +1,15 @@
 steps:
+  env:
+    image: docker.io/bash
+    commands:
+    - echo export CARGO_TERM_COLOR=always > envvars
+    - echo export GIT_CONFIG_PARAMETERS="'color.ui=always'"
+
   build:
     image: docker.io/rust:1.88
+    depends_on: [env]
     commands:
+    - . ./envvars
     - cargo version && cargo build --all
     when:
       event: [pull_request]
@@ -12,7 +20,9 @@ steps:
 
   fmt:
     image: docker.io/rust
+    depends_on: [env]
     commands:
+    - . ./envvars
     - rustup component add rustfmt
     - cargo fmt --check
     when:
@@ -24,9 +34,13 @@ steps:
 
   lint:
     image: docker.io/rust
+    depends_on: [env]
     commands:
+    - . ./envvars
+    - rustup component add clippy
     - RUSTFLAGS="-D warnings" cargo check 
     - cargo clippy -- --deny clippy::all
+    - RUSTDOCFLAGS="-D warnings" cargo +nightly doc --all-features --no-deps
     when:
       event: [pull_request]
       path:
