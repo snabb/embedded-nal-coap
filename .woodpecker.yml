@@ -18,6 +18,7 @@ steps:
     when:
       event: [pull_request]
       path:
+      - Cargo.toml
       - "src/*"
       - .woodpecker.yml
 
@@ -29,6 +30,7 @@ steps:
     when:
       event: [pull_request]
       path:
+      - Cargo.toml
       - "src/*"
       - .woodpecker.yml
     failure: ignore
@@ -43,4 +45,5 @@ steps:
       path:
         - README.md
         - src/lib.rs
+        - Cargo.toml
         - .woodpecker.yml
