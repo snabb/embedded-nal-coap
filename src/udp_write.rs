@@ -139,7 +139,8 @@ mod test {
         let msg = out.message();
         use coap_message::MinimalWritableMessage;
         msg.set_code(coap_numbers::code::GET);
-        msg.add_option(coap_numbers::option::URI_PATH.try_into().unwrap(), b"hello");
+        msg.add_option(coap_numbers::option::URI_PATH, b"hello")
+            .unwrap();
         let done = out.done();
         let written = finish_outgoing(&mut buf, false, 0x1234, 0x5678, done);
         assert_eq!(&buf[..written], &GET_HELLO);
@@ -153,7 +154,7 @@ mod test {
         let msg = out.message();
         use coap_message::MinimalWritableMessage;
         msg.set_code(coap_numbers::code::CONTENT);
-        msg.set_payload(b"World");
+        msg.set_payload(b"World").unwrap();
         let written = out.done();
         assert_eq!(
             &buf[..written],
@@ -176,7 +177,7 @@ mod test {
         let msg = out.message();
         use coap_message::MinimalWritableMessage;
         msg.set_code(coap_numbers::code::CONTENT);
-        msg.set_payload(b"x");
+        msg.set_payload(b"x").unwrap();
         let written = out.done();
 
         manual_comparison_buf[0] = 0x6d;

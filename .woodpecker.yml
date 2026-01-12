@@ -38,8 +38,8 @@ steps:
     commands:
     - . ./envvars
     - rustup component add clippy
-    - RUSTFLAGS="-D warnings" cargo check 
-    - cargo clippy -- --deny clippy::all
+    - RUSTFLAGS="-D warnings" cargo check --all-targets
+    - cargo clippy -- --deny clippy::all --all-targets
     - RUSTDOCFLAGS="-D warnings" cargo +nightly doc --all-features --no-deps
     when:
       event: [pull_request]
