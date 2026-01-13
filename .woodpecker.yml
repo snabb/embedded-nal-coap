@@ -4,6 +4,10 @@ steps:
     commands:
     - echo export CARGO_TERM_COLOR=always > envvars
     - echo export GIT_CONFIG_PARAMETERS="'color.ui=always'"
+    when:
+      - event: pull_request
+      - event: push
+        branch: main
 
   build:
     image: docker.io/rust:1.88
@@ -12,11 +16,13 @@ steps:
     - . ./envvars
     - cargo version && cargo build --all
     when:
-      event: [pull_request]
-      path:
-      - Cargo.toml
-      - "src/*"
-      - .woodpecker.yml
+      - event: pull_request
+        path:
+          - Cargo.toml
+          - "src/*"
+          - .woodpecker.yml
+      - event: push
+        branch: main
 
   fmt:
     image: docker.io/rust
@@ -26,11 +32,13 @@ steps:
     - rustup component add rustfmt
     - cargo fmt --check
     when:
-      event: [pull_request]
-      path:
-      - Cargo.toml
-      - "src/*"
-      - .woodpecker.yml
+      - event: pull_request
+        path:
+          - Cargo.toml
+          - "src/*"
+          - .woodpecker.yml
+      - event: push
+        branch: main
 
   lint:
     image: docker.io/rust
@@ -42,11 +50,13 @@ steps:
     - cargo clippy -- --deny clippy::all --all-targets
     - RUSTDOCFLAGS="-D warnings" cargo +nightly doc --all-features --no-deps
     when:
-      event: [pull_request]
-      path:
-      - Cargo.toml
-      - "src/*"
-      - .woodpecker.yml
+      - event: pull_request
+        path:
+          - Cargo.toml
+          - "src/*"
+          - .woodpecker.yml
+      - event: push
+        branch: main
     failure: ignore
 
   readme:
@@ -54,9 +64,11 @@ steps:
     commands:
     - cargo doc2readme --check
     when:
-      event: [pull_request]
-      path:
-        - README.md
-        - src/lib.rs
-        - Cargo.toml
-        - .woodpecker.yml
+      - event: pull_request
+        path:
+          - README.md
+          - src/lib.rs
+          - Cargo.toml
+          - .woodpecker.yml
+      - event: push
+        branch: main
