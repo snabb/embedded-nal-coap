@@ -1,3 +1,8 @@
+# Changes in 0.1.0-alpha.6
+
+* Breaking: Updated embedded-nal-async dependency from 0.8 to 0.9.
+* README, documentation and CI enhancements.
+
 # Changes in 0.1.0-alpha.5
 
 * Breaking: Updated rand_core dependency from 0.6 to 0.9.

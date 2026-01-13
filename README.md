@@ -68,14 +68,14 @@ out that a more effective implementation uses different tasks for send and recei
 single buffer or an at-least-1-sized pool that gets locked by the tasks).
 
 
- [__cargo_doc2readme_dependencies_info]: ggGkYW0CYXSEG_W_Gn_kaocAGwCcVPfenh7eGy6gYLEwyIe4G6-xw_FwcbpjYXKEG2R7VyeTF1PlGwQQXbRi58ywG32uc44H21YZG63EgUDCVUYqYWSFgmxjb2FwX2hhbmRsZXJlMC4yLjGCbGNvYXBfbWVzc2FnZWUwLjMuNoJsY29hcF9yZXF1ZXN0bTAuMi4wLWFscGhhLjKDcWVtYmVkZGVkLW5hbC1jb2FwbTAuMS4wLWFscGhhLjVxZW1iZWRkZWRfbmFsX2NvYXCCcmVtYmVkZGVkX25hbF9hc3luY2UwLjkuMA
+ [__cargo_doc2readme_dependencies_info]: ggGkYW0CYXSEG_W_Gn_kaocAGwCcVPfenh7eGy6gYLEwyIe4G6-xw_FwcbpjYXKEG2R7VyeTF1PlGwQQXbRi58ywG32uc44H21YZG63EgUDCVUYqYWSFgmxjb2FwX2hhbmRsZXJlMC4yLjGCbGNvYXBfbWVzc2FnZWUwLjMuNoJsY29hcF9yZXF1ZXN0bTAuMi4wLWFscGhhLjKDcWVtYmVkZGVkLW5hbC1jb2FwbTAuMS4wLWFscGhhLjZxZW1iZWRkZWRfbmFsX2NvYXCCcmVtYmVkZGVkX25hbF9hc3luY2UwLjkuMA
  [__link0]: https://crates.io/crates/embedded_nal_async/0.9.0
  [__link1]: https://crates.io/crates/coap-message-demos
  [__link10]: https://crates.io/crates/coap-handler-implementations
  [__link11]: https://crates.io/crates/embedded_nal_async/0.9.0
  [__link12]: https://docs.rs/coap_message/0.3.6/coap_message/?search=MinimalWritableMessage
  [__link13]: https://docs.rs/coap_message/0.3.6/coap_message/?search=MutableWritableMessage
- [__link2]: https://docs.rs/embedded-nal-coap/0.1.0-alpha.5/embedded_nal_coap/struct.CoAPShared.html
+ [__link2]: https://docs.rs/embedded-nal-coap/0.1.0-alpha.6/embedded_nal_coap/struct.CoAPShared.html
  [__link3]: CoAPShared::split()
  [__link4]: CoAPRuntimeClient::to()
  [__link5]: https://docs.rs/coap_request/0.2.0-alpha.2/coap_request/?search=Stack
