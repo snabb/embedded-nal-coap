@@ -66,7 +66,7 @@ pub(crate) fn parse<const TKL_MAX: usize>(buf: &[u8]) -> Result<ParsedMessage<'_
         ),
         _ => return Err(TokenTooLong { msgtype }),
     };
-    if tkl >= TKL_MAX {
+    if tkl > TKL_MAX {
         return Err(TokenTooLong { msgtype });
     }
 
@@ -146,6 +146,23 @@ mod test {
         assert_eq!(parsed.token, b"01234");
         assert_eq!(parsed.message.code(), 0x44);
         assert!(parsed.message.options().next().is_none());
+    }
+
+    #[test]
+    fn test_max_tokens() {
+        // TKL_MAX is inclusive: 8 is the longest RFC 7252 token
+        let buf = &[
+            0x48, 0x01, 1, 2, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+        ];
+        let parsed = parse::<8>(buf).unwrap();
+        assert_eq!(parsed.token, b"01234567");
+
+        let buf = &[
+            0x4d, 0x01, 1, 2, 0, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a,
+            0x3b, 0x3c,
+        ];
+        let parsed = parse::<13>(buf).unwrap();
+        assert_eq!(parsed.token, b"0123456789:;<");
     }
 
     #[test]
