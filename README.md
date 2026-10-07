@@ -1,3 +1,15 @@
+> [!IMPORTANT]
+> **This is a fork** of [chrysn/embedded-nal-coap](https://codeberg.org/chrysn/embedded-nal-coap)
+> 0.1.0-alpha.6, with these bugs fixed on `master`:
+>
+> * **Eight-byte tokens are rejected.** `udp_read::parse` checked `tkl >= TKL_MAX`, so a
+>   request with the longest token RFC 7252 §5.3.1 allows got an RST (CON) or no answer
+>   (NON). It now accepts up to `TKL_MAX` inclusive.
+>
+> The fixes are not submitted upstream: they were written with AI assistance, and Codeberg
+> does not accept AI-generated code. The version number is unchanged, so the fork can be
+> used through `[patch.crates-io]` with a git `rev`.
+
 # embedded-nal-coap ![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue) [![embedded-nal-coap on crates.io](https://img.shields.io/crates/v/embedded-nal-coap)](https://crates.io/crates/embedded-nal-coap) [![embedded-nal-coap on docs.rs](https://docs.rs/embedded-nal-coap/badge.svg)](https://docs.rs/embedded-nal-coap) [![Source Code Repository](https://img.shields.io/badge/Code-On%20Codeberg-blue?logo=Codeberg)](https://codeberg.org/chrysn/embedded-nal-coap)
 
 A CoAP server and client implementation built on [embedded_nal_async][__link0].
